@@ -131,10 +131,19 @@ function App() {
   const scanReceipt = async file => {
     if (!file) return;
     const url = URL.createObjectURL(file);
-    setReceipt({ name: file.name, url, status: "Uploaded", text: "" });
-    notify("Receipt uploaded. Review the extracted details before saving.");
-    // Browser-safe fallback: the app stores the image locally until OCR/backend is configured.
-    setReceipt(r => ({ ...r, status: "Ready for confirmation" }));
+    setReceipt({ name: file.name, url, status: "OCR running…", text: "" });
+    try {
+      if (!window.Tesseract) throw new Error("OCR engine unavailable");
+      const result = await window.Tesseract.recognize(file, "eng");
+      const text = result?.data?.text || "";
+      const amounts = [...text.matchAll(/(?:₹|Rs\\.?|INR\\s*)\\s*([0-9]{1,7}(?:[,.][0-9]{1,2})?)/gi)].map(m => Number(m[1].replace(/,/g, "")));
+      const totalGuess = amounts.length ? Math.max(...amounts) : "";
+      setReceipt(r => ({ ...r, status: "OCR complete — confirm before saving", text, totalGuess }));
+      notify(totalGuess ? `Receipt read. Suggested total ${money(totalGuess)} — confirm it.` : "Receipt text read. Confirm the total manually.");
+    } catch (e) {
+      setReceipt(r => ({ ...r, status: "OCR unavailable — manual confirmation needed" }));
+      notify("OCR could not read this receipt; manual confirmation is available.");
+    }
   };
 
   const nav = [["home","Home"],["expenses","Expenses"],["challenge","Challenge"],["research","Research"],["rewards","Rewards"],["live","Live"],["profile","Profile"],...(isOwner || !supabaseConfigured ? [["admin","Admin"]] : [])];
@@ -157,7 +166,7 @@ function App() {
         </div>
       </section>}
 
-      {tab === "expenses" && <section className="page"><div className="titleRow"><div><label>TRACK</label><h1>Expense Tracker</h1></div><button onClick={() => addExpense()}>+ Add expense</button></div><div className="panel">{expenses.map(e=><div className="expense" key={e.id}><div><b>{e.merchant}</b><small>{e.category} • {e.date}</small></div><strong>{money(e.amount)}</strong></div>)}</div><div className="panel scanner"><div><span className="pill">RECEIPT SCANNER</span><h2>Scan a receipt</h2><p>Choose a receipt image. The app keeps it local until you confirm the extracted expense.</p><label className="upload"><input type="file" accept="image/*" capture="environment" onChange={e=>scanReceipt(e.target.files?.[0])}/>Take / choose receipt</label></div>{receipt && <div className="receiptPreview"><img src={receipt.url} alt="Receipt preview"/><small>{receipt.name} • {receipt.status}</small><button className="secondary" onClick={() => addExpense({merchant:"Receipt purchase",amount:Number(window.prompt("Confirmed total ₹")||0),category:"Receipt"})}>Confirm expense</button></div>}</div></section>}
+      {tab === "expenses" && <section className="page"><div className="titleRow"><div><label>TRACK</label><h1>Expense Tracker</h1></div><button onClick={() => addExpense()}>+ Add expense</button></div><div className="panel">{expenses.map(e=><div className="expense" key={e.id}><div><b>{e.merchant}</b><small>{e.category} • {e.date}</small></div><strong>{money(e.amount)}</strong></div>)}</div><div className="panel scanner"><div><span className="pill">RECEIPT SCANNER</span><h2>Scan a receipt</h2><p>Choose a receipt image. The app keeps it local until you confirm the extracted expense.</p><label className="upload"><input type="file" accept="image/*" capture="environment" onChange={e=>scanReceipt(e.target.files?.[0])}/>Take / choose receipt</label></div>{receipt && <div className="receiptPreview"><img src={receipt.url} alt="Receipt preview"/><small>{receipt.name} • {receipt.status}</small><button className="secondary" onClick={() => addExpense({merchant:"Receipt purchase",amount:Number(window.prompt("Confirmed total ₹", receipt.totalGuess || "")||0),category:"Receipt"})}>Confirm expense</button></div>}</div></section>}
 
       {tab === "challenge" && <section className="page"><label>AI SAVINGS CHALLENGE</label><h1>Build a saving habit.</h1><div className="panel challenge"><div className="check">✓</div><div className="grow"><h2>7-Day Smart Spending Challenge</h2><p>Log spending daily, avoid one unnecessary purchase, and keep your weekly cap.</p><div className="progress"><i style={{width:(challengeDays/7*100)+"%"}}/></div><small>{challengeDays} of 7 days completed</small></div><button onClick={()=>{if(challengeDays>=7)return notify("Challenge complete.");setChallengeDays(d=>d+1);setCoins(c=>Math.min(50000,c+500));notify("Challenge day recorded • 500 coins added for review")}}>Log today</button></div><div className="cols"><div className="panel"><h2>Coin rules</h2><p>Positive activity can earn coins; every award should have a reason.</p><ul><li>30,000 coins → ₹10 eligibility</li><li>50,000 coins → ₹30 eligibility</li><li>Above 50,000 → no extra cash tier</li><li>Abuse can cause restriction or denial after review</li></ul></div><div className="panel"><h2>Your coins</h2><strong className="big">{coins.toLocaleString()}</strong><p>{coins<30000 ? (30000-coins).toLocaleString()+" to first reward tier" : coins<50000 ? (50000-coins).toLocaleString()+" to second tier" : "Highest cash tier reached"}</p></div></div></section>}
 
