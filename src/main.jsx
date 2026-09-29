@@ -4,7 +4,7 @@ import "./styles.css";
 import { supabase, supabaseConfigured } from "./lib/supabaseClient";
 
 const OWNER_EMAIL = "skijajahmadstudio@gmail.com";
-const SUPPORT_EMAIL = "skijajmadsupportstudio@gmail.com";
+const SUPPORT_EMAIL = "skijajahmadsupportstudio@gmail.com";
 const seedExpenses = [
   { id: "1", merchant: "Grocery", category: "Food", amount: 1450, date: "2026-09-28" },
   { id: "2", merchant: "Transport", category: "Transport", amount: 620, date: "2026-09-27" },
@@ -70,15 +70,41 @@ function App() {
     notify("Expense saved • 250 coins added for review");
   };
 
-  const askAI = () => {
+  const askAI = async () => {
     if (!question.trim()) return;
     if (questionsUsed >= aiLimit) return notify("Daily AI question limit reached.");
-    const q = question.toLowerCase();
+
+    const asked = question;
+    const q = asked.toLowerCase();
     let answer = `You recorded ${money(total)} of expenses and about ${money(savings)} remains from the current income.`;
     if (/save|saving|reduce|কম|বাঁচ/.test(q)) answer = `Your largest recorded category is ${top ? top[0] : "Other"} at ${money(top ? top[1] : 0)}. Try a weekly cap, delay non-essential purchases by 24 hours, and review that category first.`;
     if (/why|ran out|শেষ|খরচ/.test(q)) answer = `The current numbers show ${money(total)} spent. ${top ? top[0] + " is your largest category." : "There is not enough category data yet."} Add every daily expense so I can spot patterns.`;
     if (/purchase|buy|কিনব|কেনা/.test(q)) answer = "I can help compare the purchase with your budget and goal. Tell me the price, purpose, and whether it is essential.";
-    setChat(x => [...x, { role: "user", text: question }, { role: "ai", text: answer }]);
+
+    if (supabaseConfigured && session) {
+      try {
+        const { data, error } = await supabase.functions.invoke("ai-assistant", {
+          body: {
+            question: asked,
+            context: {
+              totalExpenses: total,
+              savings,
+              topCategory: top ? top[0] : "Other",
+            },
+          },
+        });
+        if (!error && data?.answer) {
+          answer = data.answer;
+          setChat(x => [...x, { role: "user", text: asked }, { role: "ai", text: answer }]);
+          setQuestion("");
+          return;
+        }
+      } catch {
+        // Keep the local fallback available if the Edge Function is not deployed yet.
+      }
+    }
+
+    setChat(x => [...x, { role: "user", text: asked }, { role: "ai", text: answer }]);
     setQuestion("");
   };
 
@@ -107,7 +133,7 @@ function App() {
     setModal({ title: "Business idea plan", body: [
       `Skill: ${business.skill || "general"}; starting capital: ${money(capital)}.`,
       `Illustrative income range: ${ranges}; this is not a promise.`,
-      "Start with one small offer, validate with 5–10 customers, track acquisition cost, margin and repeat orders.",
+      "Start with one small offer, validate with 5–10 customers, track acquisition cost, margin and repeat orders. Keep business money separate from personal spending.",
       "Risks: demand, competition, refunds, platform fees and working-capital needs."
     ]});
   };
