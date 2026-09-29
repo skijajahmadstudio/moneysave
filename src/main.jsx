@@ -1,13 +1,16 @@
 import React,{useMemo,useState}from"react";
 import{createRoot}from"react-dom/client";
 import"./styles.css";
+import { supabase, supabaseConfigured } from "./lib/supabaseClient";
 
 const owner="skijajahmadstudio@gmail.com";
 const initial=[{id:1,merchant:"Grocery",category:"Food",amount:1450,date:"2026-09-28"},{id:2,merchant:"Transport",category:"Transport",amount:620,date:"2026-09-27"},{id:3,merchant:"Online Shopping",category:"Shopping",amount:1890,date:"2026-09-25"},{id:4,merchant:"Electricity",category:"Bills",amount:980,date:"2026-09-22"}];
 const money=n=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",maximumFractionDigits:0}).format(n);
 
 function App(){
+ const[session,setSession]=useState(null);
  const[tab,setTab]=useState("home"),[income]=useState(42000),[expenses,setExpenses]=useState(initial),[coins,setCoins]=useState(18400),[premium]=useState(false),[question,setQuestion]=useState(""),[chat,setChat]=useState([{role:"ai",text:"Hello! I’m your AI Financial Friend. Tell me what you spent today or ask where you can save."}]),[toast,setToast]=useState("");
+ useEffect(()=>{if(!supabaseConfigured)return;supabase.auth.getSession().then(({data})=>setSession(data.session));const {data:{subscription}}=supabase.auth.onAuthStateChange((_e,s)=>setSession(s));return()=>subscription.unsubscribe()},[]);
  const total=expenses.reduce((s,e)=>s+e.amount,0),savings=Math.max(income-total,0);
  const cats=useMemo(()=>expenses.reduce((a,e)=>(a[e.category]=(a[e.category]||0)+e.amount,a),{}),[expenses]);
  const top=Object.entries(cats).sort((a,b)=>b[1]-a[1])[0];
@@ -16,8 +19,8 @@ function App(){
  const askAI=()=>{if(!question.trim())return;const limit=premium?100:30;if(chat.filter(x=>x.role==="user").length>=limit)return notify("Daily AI question limit reached.");let answer=`Your recorded expenses are ${money(total)} and estimated savings are ${money(savings)}.`;const q=question.toLowerCase();if(q.includes("save")||q.includes("reduce"))answer=`Your highest recorded category is ${top?top[0]:"Other"} at ${money(top?top[1]:0)}. Consider setting a weekly cap and reviewing non-essential purchases before paying.`;setChat(x=>[...x,{role:"user",text:question},{role:"ai",text:answer}]);setQuestion("")};
  const nav=[["home","Home"],["expenses","Expenses"],["challenge","Challenge"],["rewards","Rewards"],["live","Live"],["profile","Profile"],["admin","Admin"]];
  return <div className="app">
-  <header><div className="brand"><div className="logo">MS</div><div><b>Money Save</b><small>Save • Secure • Grow</small></div></div><div className="headerMeta"><span className={premium?"badge premium":"badge"}>{premium?"PREMIUM":"FREE"}</span><span>🪙 {coins.toLocaleString()}</span></div></header>
-  <main>
+  <header><div className="brand"><div className="logo">MS</div><div><b>Money Save</b><small>Save • Secure • Grow</small></div></div><div className="headerMeta"><span className={premium?"badge premium":"badge"}>{premium?"PREMIUM":"FREE"}</span><span>🪙 {coins.toLocaleString()}</span>{supabaseConfigured&&session&&<button className="signout" onClick={()=>supabase.auth.signOut()}>Sign out</button>}</div></header>
+  <main>{supabaseConfigured&&!session&&<section className="authGate"><div className="panel authCard"><label>SECURE ACCOUNT</label><h1>Sign in to Money Save</h1><p>Use your email to continue. Your finance data is protected behind authenticated access.</p><button onClick={async()=>{const email=prompt("Enter your email");if(!email)return;const {error}=await supabase.auth.signInWithOtp({email,options:{emailRedirectTo:window.location.origin}});notify(error?error.message:"Check your email for the secure sign-in link.")}}>Send secure login link</button><small>Google sign-in will be enabled through the authentication provider configuration.</small></div></section>}
    {tab==="home"&&<section className="page"><div className="hero"><div><label>GOOD MONEY HABITS</label><h1>Make every rupee count.</h1><p>Save your money, secure it, and watch your future savings grow.</p></div><button onClick={addExpense}>+ Add Expense</button></div>
     <div className="cards">{[["Total income",money(income),"This month"],["Total expenses",money(total),expenses.length+" recorded items"],["Estimated savings",money(savings),Math.round(savings/income*100)+"% savings rate"],["Savings goal",Math.min(100,Math.round(savings/30000*100))+"%","Goal ₹30,000"]].map(x=><div className="card"><span>{x[0]}</span><strong>{x[1]}</strong><small>{x[2]}</small></div>)}</div>
     <div className="cols"><div className="panel"><div className="panelTitle"><h2>AI Financial Friend</h2><em>● Online</em></div><div className="chat">{chat.slice(-5).map((m,i)=><div className={"msg "+m.role} key={i}>{m.text}</div>)}</div><div className="ask"><input value={question} onChange={e=>setQuestion(e.target.value)} onKeyDown={e=>e.key==="Enter"&&askAI()} placeholder="Ask about your money…"/><button onClick={askAI}>Ask</button></div><small className="hint">{premium?"100":"30"} AI questions/day</small></div>
