@@ -1,8 +1,18 @@
 {
-  "name":"money-save",
-  "private":true,
-  "version":"0.1.0",
-  "type":"module",
-  "scripts":{"dev":"vite","build":"vite build","preview":"vite preview"},
-  "dependencies":{"vite":"latest","react":"latest","react-dom":"latest","@vitejs/plugin-react":"latest"}
+  "name": "money-save",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "vite": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "@vitejs/plugin-react": "latest",
+    "@supabase/supabase-js": "latest"
+  }
 }
