@@ -1,39 +1,181 @@
-import React,{useEffect,useMemo,useState}from"react";
-import{createRoot}from"react-dom/client";
-import"./styles.css";
+import React, { useEffect, useMemo, useState } from "react";
+import { createRoot } from "react-dom/client";
+import "./styles.css";
 import { supabase, supabaseConfigured } from "./lib/supabaseClient";
 
-const owner="skijajahmadstudio@gmail.com";
-const initial=[{id:1,merchant:"Grocery",category:"Food",amount:1450,date:"2026-09-28"},{id:2,merchant:"Transport",category:"Transport",amount:620,date:"2026-09-27"},{id:3,merchant:"Online Shopping",category:"Shopping",amount:1890,date:"2026-09-25"},{id:4,merchant:"Electricity",category:"Bills",amount:980,date:"2026-09-22"}];
-const money=n=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",maximumFractionDigits:0}).format(n);
+const OWNER_EMAIL = "skijajahmadstudio@gmail.com";
+const SUPPORT_EMAIL = "skijajmadsupportstudio@gmail.com";
+const seedExpenses = [
+  { id: "1", merchant: "Grocery", category: "Food", amount: 1450, date: "2026-09-28" },
+  { id: "2", merchant: "Transport", category: "Transport", amount: 620, date: "2026-09-27" },
+  { id: "3", merchant: "Online Shopping", category: "Shopping", amount: 1890, date: "2026-09-25" },
+  { id: "4", merchant: "Electricity", category: "Bills", amount: 980, date: "2026-09-22" },
+];
+const money = n => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(Number(n) || 0);
+const today = () => new Date().toISOString().slice(0, 10);
+const uid = () => "MS-" + Math.random().toString(36).slice(2, 10).toUpperCase();
 
-function App(){
- const[session,setSession]=useState(null);
- const[tab,setTab]=useState("home"),[income]=useState(42000),[expenses,setExpenses]=useState(initial),[coins,setCoins]=useState(18400),[premium]=useState(false),[question,setQuestion]=useState(""),[chat,setChat]=useState([{role:"ai",text:"Hello! I’m your AI Financial Friend. Tell me what you spent today or ask where you can save."}]),[toast,setToast]=useState("");
- useEffect(()=>{if(!supabaseConfigured)return;supabase.auth.getSession().then(({data})=>setSession(data.session));const {data:{subscription}}=supabase.auth.onAuthStateChange((_e,s)=>setSession(s));return()=>subscription.unsubscribe()},[]);
- const total=expenses.reduce((s,e)=>s+e.amount,0),savings=Math.max(income-total,0);
- const cats=useMemo(()=>expenses.reduce((a,e)=>(a[e.category]=(a[e.category]||0)+e.amount,a),{}),[expenses]);
- const top=Object.entries(cats).sort((a,b)=>b[1]-a[1])[0];
- const notify=t=>{setToast(t);setTimeout(()=>setToast(""),2500)};
- const addExpense=()=>{const amount=Number(prompt("Expense amount (₹)")||0);if(!amount)return;const merchant=prompt("What was it for?")||"Expense";setExpenses(x=>[{id:Date.now(),merchant,category:"Other",amount,date:new Date().toISOString().slice(0,10)},...x]);setCoins(x=>Math.min(50000,x+250));notify("Expense added • 250 coins credited for AI review")};
- const askAI=()=>{if(!question.trim())return;const limit=premium?100:30;if(chat.filter(x=>x.role==="user").length>=limit)return notify("Daily AI question limit reached.");let answer=`Your recorded expenses are ${money(total)} and estimated savings are ${money(savings)}.`;const q=question.toLowerCase();if(q.includes("save")||q.includes("reduce"))answer=`Your highest recorded category is ${top?top[0]:"Other"} at ${money(top?top[1]:0)}. Consider setting a weekly cap and reviewing non-essential purchases before paying.`;setChat(x=>[...x,{role:"user",text:question},{role:"ai",text:answer}]);setQuestion("")};
- const nav=[["home","Home"],["expenses","Expenses"],["challenge","Challenge"],["rewards","Rewards"],["live","Live"],["profile","Profile"],["admin","Admin"]];
- return <div className="app">
-  <header><div className="brand"><div className="logo">MS</div><div><b>Money Save</b><small>Save • Secure • Grow</small></div></div><div className="headerMeta"><span className={premium?"badge premium":"badge"}>{premium?"PREMIUM":"FREE"}</span><span>🪙 {coins.toLocaleString()}</span>{supabaseConfigured&&session&&<button className="signout" onClick={()=>supabase.auth.signOut()}>Sign out</button>}</div></header>
-  <main>{supabaseConfigured&&!session&&<section className="authGate"><div className="panel authCard"><label>SECURE ACCOUNT</label><h1>Sign in to Money Save</h1><p>Use your email to continue. Your finance data is protected behind authenticated access.</p><button onClick={async()=>{const email=prompt("Enter your email");if(!email)return;const {error}=await supabase.auth.signInWithOtp({email,options:{emailRedirectTo:window.location.origin}});notify(error?error.message:"Check your email for the secure sign-in link.")}}>Send secure login link</button><small>Google sign-in will be enabled through the authentication provider configuration.</small></div></section>}
-   {tab==="home"&&<section className="page"><div className="hero"><div><label>GOOD MONEY HABITS</label><h1>Make every rupee count.</h1><p>Save your money, secure it, and watch your future savings grow.</p></div><button onClick={addExpense}>+ Add Expense</button></div>
-    <div className="cards">{[["Total income",money(income),"This month"],["Total expenses",money(total),expenses.length+" recorded items"],["Estimated savings",money(savings),Math.round(savings/income*100)+"% savings rate"],["Savings goal",Math.min(100,Math.round(savings/30000*100))+"%","Goal ₹30,000"]].map(x=><div className="card"><span>{x[0]}</span><strong>{x[1]}</strong><small>{x[2]}</small></div>)}</div>
-    <div className="cols"><div className="panel"><div className="panelTitle"><h2>AI Financial Friend</h2><em>● Online</em></div><div className="chat">{chat.slice(-5).map((m,i)=><div className={"msg "+m.role} key={i}>{m.text}</div>)}</div><div className="ask"><input value={question} onChange={e=>setQuestion(e.target.value)} onKeyDown={e=>e.key==="Enter"&&askAI()} placeholder="Ask about your money…"/><button onClick={askAI}>Ask</button></div><small className="hint">{premium?"100":"30"} AI questions/day</small></div>
-    <div className="panel"><div className="panelTitle"><h2>Spending insight</h2><span className="pill">AI</span></div><div className="insight"><div className="ring">{top?Math.round(top[1]/total*100):0}%</div><div><b>{top?top[0]:"No data yet"}</b><p>Your highest recorded spending category. Review non-essential purchases here first.</p></div></div><hr/><h3>Daily check-in</h3><p>How much did you spend today, and what was it for?</p><button className="secondary" onClick={addExpense}>Log today’s spending</button></div></div>
-   </section>}
-   {tab==="expenses"&&<section className="page"><div className="titleRow"><div><label>TRACK</label><h1>Expense Tracker</h1></div><button onClick={addExpense}>+ Add expense</button></div><div className="panel">{expenses.map(e=><div className="expense"><div><b>{e.merchant}</b><small>{e.category} • {e.date}</small></div><strong>{money(e.amount)}</strong></div>)}</div><div className="panel scanner"><div><span className="pill">RECEIPT SCANNER</span><h2>Turn receipts into expenses</h2><p>AI extracts merchant, date, items, category and total, then asks you to confirm before saving.</p></div><button className="secondary" onClick={()=>notify("Receipt Scanner is ready for OCR + secure storage integration.")}>Scan receipt</button></div></section>}
-   {tab==="challenge"&&<section className="page"><label>AI SAVINGS CHALLENGE</label><h1>Build a saving habit.</h1><div className="panel challenge"><div className="check">✓</div><div className="grow"><h2>7-Day Smart Spending Challenge</h2><p>Log spending daily, avoid one unnecessary purchase, and keep your weekly cap.</p><div className="progress"><i/></div><small>4 of 7 days completed</small></div><button onClick={()=>{setCoins(x=>x+500);notify("Challenge activity recorded • 500 coins added for review")}}>Log today</button></div><div className="cols"><div className="panel"><h2>Coin rules</h2><p>AI reviews positive financial activity and records a reason for each award.</p><ul><li>30,000 coins → ₹10 eligibility</li><li>50,000 coins → ₹30 eligibility</li><li>Above 50,000 → no additional cash tier</li></ul></div><div className="panel"><h2>Your coins</h2><strong className="big">{coins.toLocaleString()}</strong><p>Next reward tier at 30,000</p></div></div></section>}
-   {tab==="rewards"&&<section className="page"><label>REWARDS</label><h1>Reward & verification</h1><div className="cols"><div className="panel"><h2>30,000 coins</h2><strong className="reward">₹10</strong><p>Subject to eligibility, verification and Rewards Policy.</p></div><div className="panel"><h2>50,000 coins</h2><strong className="reward">₹30</strong><p>Payment is not guaranteed; anti-fraud and bank verification apply.</p></div></div><div className="panel"><h2>Claim workflow</h2><div className="steps"><span>1 Submitted</span><span>2 Verified</span><span>3 Paid</span></div><button className="secondary" onClick={()=>notify("Verification form: bank account, IFSC, holder name and bank proof.")}>Start verification</button></div></section>}
-   {tab==="live"&&<section className="page"><label>LIVE MEETING GATEWAY</label><h1>Learn from top savers.</h1><div className="live"><div className="video"><span>LIVE</span><b>Live session player</b><small>10:00–10:30 AM • 8:00–8:30 PM</small></div><div className="panel"><h2>Today’s sessions</h2><p>Hosts can be selected from respected top contributors. Exact savings amounts are never shown publicly.</p><p>Free: 10 min/day • Premium: 30 min/day</p><button onClick={()=>notify("Live viewer opened. Video provider integration comes next.")}>Join live</button></div></div></section>}
-   {tab==="profile"&&<section className="page"><label>ACCOUNT</label><h1>Your profile</h1><div className="panel profile"><div className="avatar">MS</div><div><h2>Money Save User</h2><p>User ID: <b>MS-USER-000001</b></p><span className="badge">FREE USER</span></div></div><div className="panel"><h2>Upgrade to Premium</h2><p>Premium raises AI questions from 30/day to 100/day and unlocks advanced analysis features.</p><button onClick={()=>notify("Premium payment flow is prepared for PhonePe QR + screenshot review.")}>Upgrade</button></div></section>}
-   {tab==="admin"&&<section className="page"><label>OWNER CONTROL</label><h1>Admin Command Center</h1><div className="notice">Owner account: <b>{owner}</b></div><div className="cards">{["Users","Payments","Rewards","Moderation"].map(x=><div className="card"><span>{x}</span><strong>—</strong><small>Control panel</small></div>)}</div><div className="panel"><h2>Security-first controls</h2><p>Server-side owner authorization, roles, audit logs, private payment documents, reward verification, suspicious-payment review and 24-hour restriction workflows are planned for the backend.</p></div></section>}
-  </main>
-  <nav>{nav.map(([id,name])=><button className={tab===id?"active":""} onClick={()=>setTab(id)}>{name}</button>)}</nav>{toast&&<div className="toast">{toast}</div>}
- </div>
+function App() {
+  const [session, setSession] = useState(null);
+  const [tab, setTab] = useState("home");
+  const [income, setIncome] = useState(() => Number(localStorage.getItem("ms_income") || 42000));
+  const [expenses, setExpenses] = useState(() => JSON.parse(localStorage.getItem("ms_expenses") || "null") || seedExpenses);
+  const [coins, setCoins] = useState(() => Number(localStorage.getItem("ms_coins") || 18400));
+  const [premium, setPremium] = useState(() => localStorage.getItem("ms_premium") === "true");
+  const [userId] = useState(() => localStorage.getItem("ms_uid") || uid());
+  const [question, setQuestion] = useState("");
+  const [chat, setChat] = useState([{ role: "ai", text: "Hello! I’m your AI Financial Friend. Ask me about spending, saving, goals, or a purchase." }]);
+  const [toast, setToast] = useState("");
+  const [modal, setModal] = useState(null);
+  const [receipt, setReceipt] = useState(null);
+  const [research, setResearch] = useState({ type: "stock", name: "", amount: 10000, years: 5, rate: 10, risk: "medium" });
+  const [business, setBusiness] = useState({ capital: 10000, skill: "online sales" });
+  const [payment, setPayment] = useState({ reference: "", file: null, status: "Not submitted" });
+  const [challengeDays, setChallengeDays] = useState(() => Number(localStorage.getItem("ms_challenge") || 4));
+  const [checkin, setCheckin] = useState({ amount: "", purpose: "", need: "yes" });
+  const [liveOpen, setLiveOpen] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem("ms_uid", userId);
+    localStorage.setItem("ms_income", income);
+    localStorage.setItem("ms_expenses", JSON.stringify(expenses));
+    localStorage.setItem("ms_coins", coins);
+    localStorage.setItem("ms_premium", premium);
+    localStorage.setItem("ms_challenge", challengeDays);
+  }, [userId, income, expenses, coins, premium, challengeDays]);
+
+  useEffect(() => {
+    if (!supabaseConfigured) return;
+    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, next) => setSession(next));
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const notify = text => { setToast(text); window.clearTimeout(window.__msToast); window.__msToast = window.setTimeout(() => setToast(""), 2800); };
+  const total = expenses.reduce((s, e) => s + Number(e.amount), 0);
+  const savings = Math.max(income - total, 0);
+  const cats = useMemo(() => expenses.reduce((a, e) => { a[e.category] = (a[e.category] || 0) + Number(e.amount); return a; }, {}), [expenses]);
+  const top = Object.entries(cats).sort((a, b) => b[1] - a[1])[0];
+  const isOwner = session?.user?.email?.toLowerCase() === OWNER_EMAIL;
+  const aiLimit = premium ? 100 : 30;
+  const questionsUsed = chat.filter(x => x.role === "user").length;
+
+  const addExpense = (prefill = {}) => {
+    const amount = Number(prefill.amount ?? window.prompt("Expense amount (₹)") || 0);
+    if (!amount) return;
+    const merchant = prefill.merchant ?? window.prompt("What was it for?") ?? "Expense";
+    const category = prefill.category ?? "Other";
+    setExpenses(x => [{ id: Date.now().toString(), merchant, category, amount, date: today() }, ...x]);
+    setCoins(x => Math.min(50000, x + 250));
+    notify("Expense saved • 250 coins added for review");
+  };
+
+  const askAI = () => {
+    if (!question.trim()) return;
+    if (questionsUsed >= aiLimit) return notify("Daily AI question limit reached.");
+    const q = question.toLowerCase();
+    let answer = `You recorded ${money(total)} of expenses and about ${money(savings)} remains from the current income.`;
+    if (/save|saving|reduce|কম|বাঁচ/.test(q)) answer = `Your largest recorded category is ${top ? top[0] : "Other"} at ${money(top ? top[1] : 0)}. Try a weekly cap, delay non-essential purchases by 24 hours, and review that category first.`;
+    if (/why|ran out|শেষ|খরচ/.test(q)) answer = `The current numbers show ${money(total)} spent. ${top ? top[0] + " is your largest category." : "There is not enough category data yet."} Add every daily expense so I can spot patterns.`;
+    if (/purchase|buy|কিনব|কেনা/.test(q)) answer = "I can help compare the purchase with your budget and goal. Tell me the price, purpose, and whether it is essential.";
+    setChat(x => [...x, { role: "user", text: question }, { role: "ai", text: answer }]);
+    setQuestion("");
+  };
+
+  const logCheckin = () => {
+    const amount = Number(checkin.amount);
+    if (!amount || !checkin.purpose) return notify("Enter amount and purpose first.");
+    addExpense({ amount, merchant: checkin.purpose, category: "Daily Check-in" });
+    setCheckin({ amount: "", purpose: "", need: "yes" });
+  };
+
+  const runResearch = () => {
+    const P = Number(research.amount), r = Number(research.rate) / 100, y = Number(research.years);
+    const future = P * Math.pow(1 + r, y);
+    const doubling = r > 0 ? Math.log(2) / Math.log(1 + r) : Infinity;
+    setModal({ title: "Research estimate", body: [
+      `Illustrative value after ${y} years at ${research.rate}%: ${money(future)}.`,
+      `Illustrative doubling time at that rate: ${Number.isFinite(doubling) ? doubling.toFixed(1) + " years" : "not available"}.`,
+      `Risk setting: ${research.risk}. Actual returns, fees, taxes and losses vary by product and market.`,
+      "This is an educational calculator, not a guaranteed return or investment recommendation."
+    ]});
+  };
+
+  const runBusiness = () => {
+    const capital = Number(business.capital);
+    const ranges = capital < 10000 ? "₹3,000–₹12,000/month potential range" : capital < 50000 ? "₹8,000–₹30,000/month potential range" : "₹15,000–₹60,000/month potential range";
+    setModal({ title: "Business idea plan", body: [
+      `Skill: ${business.skill || "general"}; starting capital: ${money(capital)}.`,
+      `Illustrative income range: ${ranges}; this is not a promise.`,
+      "Start with one small offer, validate with 5–10 customers, track acquisition cost, margin and repeat orders.",
+      "Risks: demand, competition, refunds, platform fees and working-capital needs."
+    ]});
+  };
+
+  const submitPayment = () => {
+    if (!payment.reference && !payment.file) return notify("Add a transaction reference or payment screenshot.");
+    setPayment(p => ({ ...p, status: "Automated Review" }));
+    notify("Payment submitted • Automated Review → Human Review");
+    setTimeout(() => setPayment(p => ({ ...p, status: "Human Review" })), 1200);
+  };
+
+  const claimReward = threshold => {
+    if (coins < threshold) return notify(`You need ${threshold.toLocaleString()} coins for this tier.`);
+    setModal({ title: "Reward verification", body: [
+      `You are eligible to submit the ₹${threshold === 30000 ? 10 : 30} claim for review.`,
+      "Verification asks for account-holder name, IFSC, bank account details and bank proof.",
+      "Status will move through Submitted → Verified → Paid, or Pending/Rejected/Payment Failed. Eligibility does not guarantee payment."
+    ]});
+  };
+
+  const scanReceipt = async file => {
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    setReceipt({ name: file.name, url, status: "Uploaded", text: "" });
+    notify("Receipt uploaded. Review the extracted details before saving.");
+    // Browser-safe fallback: the app stores the image locally until OCR/backend is configured.
+    setReceipt(r => ({ ...r, status: "Ready for confirmation" }));
+  };
+
+  const nav = [["home","Home"],["expenses","Expenses"],["challenge","Challenge"],["research","Research"],["rewards","Rewards"],["live","Live"],["profile","Profile"],...(isOwner || !supabaseConfigured ? [["admin","Admin"]] : [])];
+
+  return <div className="app">
+    <header>
+      <div className="brand"><div className="logo">MS</div><div><b>Money Save</b><small>Save • Secure • Grow</small></div></div>
+      <div className="headerMeta"><span className={premium ? "badge premium" : "badge"}>{premium ? "PREMIUM" : "FREE"}</span><span>🪙 {coins.toLocaleString()}</span>{supabaseConfigured && session && <button className="signout" onClick={() => supabase.auth.signOut()}>Sign out</button>}</div>
+    </header>
+
+    <main>
+      {supabaseConfigured && !session && <section className="authGate"><div className="panel authCard"><label>SECURE ACCOUNT</label><h1>Sign in to Money Save</h1><p>Use email OTP to protect your finance data.</p><button onClick={async () => { const email = window.prompt("Enter your email"); if (!email) return; const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.origin } }); notify(error ? error.message : "Check your email for the secure sign-in link."); }}>Send secure login link</button><small>Google sign-in can be enabled in your Supabase authentication providers.</small></div></section>}
+
+      {tab === "home" && <section className="page">
+        <div className="hero"><div><label>GOOD MONEY HABITS</label><h1>Make every rupee count.</h1><p>Save your money, secure it, and watch your future savings grow.</p></div><button onClick={() => addExpense()}>+ Add Expense</button></div>
+        <div className="cards">{[["Total income",money(income),"This month"],["Total expenses",money(total),expenses.length+" recorded"],["Estimated savings",money(savings),Math.round(savings / Math.max(income,1) * 100)+"% savings rate"],["Goal progress",Math.min(100,Math.round(savings/30000*100))+"%","Goal ₹30,000"]].map(x=><div className="card" key={x[0]}><span>{x[0]}</span><strong>{x[1]}</strong><small>{x[2]}</small></div>)}</div>
+        <div className="cols">
+          <div className="panel"><div className="panelTitle"><h2>AI Financial Friend</h2><em>● Online</em></div><div className="chat">{chat.slice(-6).map((m,i)=><div className={"msg "+m.role} key={i}>{m.text}</div>)}</div><div className="ask"><input value={question} onChange={e=>setQuestion(e.target.value)} onKeyDown={e=>e.key==="Enter"&&askAI()} placeholder="Ask about your money…"/><button onClick={askAI}>Ask</button></div><small className="hint">{questionsUsed}/{aiLimit} questions today</small></div>
+          <div className="panel"><div className="panelTitle"><h2>Spending insight</h2><span className="pill">AI</span></div><div className="insight"><div className="ring">{top ? Math.round(top[1]/Math.max(total,1)*100) : 0}%</div><div><b>{top ? top[0] : "No data yet"}</b><p>Your highest recorded spending category. Review non-essential purchases here first.</p></div></div><hr/><h3>Daily check-in</h3><div className="formGrid"><input value={checkin.amount} onChange={e=>setCheckin({...checkin,amount:e.target.value})} placeholder="Spent today ₹"/><input value={checkin.purpose} onChange={e=>setCheckin({...checkin,purpose:e.target.value})} placeholder="What was it for?"/></div><button className="secondary" onClick={logCheckin}>Save check-in</button></div>
+        </div>
+      </section>}
+
+      {tab === "expenses" && <section className="page"><div className="titleRow"><div><label>TRACK</label><h1>Expense Tracker</h1></div><button onClick={() => addExpense()}>+ Add expense</button></div><div className="panel">{expenses.map(e=><div className="expense" key={e.id}><div><b>{e.merchant}</b><small>{e.category} • {e.date}</small></div><strong>{money(e.amount)}</strong></div>)}</div><div className="panel scanner"><div><span className="pill">RECEIPT SCANNER</span><h2>Scan a receipt</h2><p>Choose a receipt image. The app keeps it local until you confirm the extracted expense.</p><label className="upload"><input type="file" accept="image/*" capture="environment" onChange={e=>scanReceipt(e.target.files?.[0])}/>Take / choose receipt</label></div>{receipt && <div className="receiptPreview"><img src={receipt.url} alt="Receipt preview"/><small>{receipt.name} • {receipt.status}</small><button className="secondary" onClick={() => addExpense({merchant:"Receipt purchase",amount:Number(window.prompt("Confirmed total ₹")||0),category:"Receipt"})}>Confirm expense</button></div>}</div></section>}
+
+      {tab === "challenge" && <section className="page"><label>AI SAVINGS CHALLENGE</label><h1>Build a saving habit.</h1><div className="panel challenge"><div className="check">✓</div><div className="grow"><h2>7-Day Smart Spending Challenge</h2><p>Log spending daily, avoid one unnecessary purchase, and keep your weekly cap.</p><div className="progress"><i style={{width:(challengeDays/7*100)+"%"}}/></div><small>{challengeDays} of 7 days completed</small></div><button onClick={()=>{if(challengeDays>=7)return notify("Challenge complete.");setChallengeDays(d=>d+1);setCoins(c=>Math.min(50000,c+500));notify("Challenge day recorded • 500 coins added for review")}}>Log today</button></div><div className="cols"><div className="panel"><h2>Coin rules</h2><p>Positive activity can earn coins; every award should have a reason.</p><ul><li>30,000 coins → ₹10 eligibility</li><li>50,000 coins → ₹30 eligibility</li><li>Above 50,000 → no extra cash tier</li><li>Abuse can cause restriction or denial after review</li></ul></div><div className="panel"><h2>Your coins</h2><strong className="big">{coins.toLocaleString()}</strong><p>{coins<30000 ? (30000-coins).toLocaleString()+" to first reward tier" : coins<50000 ? (50000-coins).toLocaleString()+" to second tier" : "Highest cash tier reached"}</p></div></div></section>}
+
+      {tab === "research" && <section className="page"><label>AI RESEARCH</label><h1>Investment & income research.</h1><div className="cols"><div className="panel"><h2>Investment research calculator</h2><p>Compare a hypothetical stock, mutual fund, FD, gold or ETF scenario. No guarantees.</p><div className="formGrid"><select value={research.type} onChange={e=>setResearch({...research,type:e.target.value})}><option>stock</option><option>mutual fund</option><option>FD</option><option>gold</option><option>ETF</option></select><input value={research.name} onChange={e=>setResearch({...research,name:e.target.value})} placeholder="Name / symbol"/><input type="number" value={research.amount} onChange={e=>setResearch({...research,amount:e.target.value})} placeholder="Amount"/><input type="number" value={research.years} onChange={e=>setResearch({...research,years:e.target.value})} placeholder="Years"/><input type="number" value={research.rate} onChange={e=>setResearch({...research,rate:e.target.value})} placeholder="Illustrative %"/><select value={research.risk} onChange={e=>setResearch({...research,risk:e.target.value})}><option>low</option><option>medium</option><option>high</option></select></div><button onClick={runResearch}>Analyze scenario</button><button className="secondary" onClick={()=>window.open("https://www.google.com/search?q="+encodeURIComponent((research.name||research.type)+" latest fees risk India"),"_blank")}>Open live research</button></div><div className="panel"><h2>Business / income ideas</h2><p>Generate a practical starting plan from your capital and skills.</p><div className="formGrid"><input type="number" value={business.capital} onChange={e=>setBusiness({...business,capital:e.target.value})} placeholder="Capital ₹"/><input value={business.skill} onChange={e=>setBusiness({...business,skill:e.target.value})} placeholder="Your skill"/></div><button onClick={runBusiness}>Create plan</button></div></div></section>}
+
+      {tab === "rewards" && <section className="page"><label>REWARDS</label><h1>Reward & verification</h1><div className="cols"><div className="panel"><h2>30,000 coins</h2><strong className="reward">₹10</strong><p>Eligibility only; verification and policy review apply.</p><button onClick={()=>claimReward(30000)}>Submit claim</button></div><div className="panel"><h2>50,000 coins</h2><strong className="reward">₹30</strong><p>No extra cash tier above 50,000 coins.</p><button onClick={()=>claimReward(50000)}>Submit claim</button></div></div><div className="panel"><h2>Premium activation</h2><p>Submit your PhonePe payment reference or screenshot. Automated review is followed by human verification.</p><div className="formGrid"><input value={payment.reference} onChange={e=>setPayment({...payment,reference:e.target.value})} placeholder="PhonePe transaction/reference ID"/><label className="upload"><input type="file" accept="image/*" onChange={e=>setPayment({...payment,file:e.target.files?.[0]})}/>Upload payment screenshot</label></div><p>Status: <b>{payment.status}</b></p><button onClick={submitPayment}>Submit for verification</button><button className="secondary" onClick={()=>{setPremium(true);notify("Premium demo mode enabled locally. Real approval still requires verification.")}}>Demo Premium</button></div></section>}
+
+      {tab === "live" && <section className="page"><label>LIVE MEETING GATEWAY</label><h1>Learn from top savers.</h1><div className="live"><div className="video liveBox">{liveOpen ? <iframe title="Money Save Live" src="https://meet.jit.si/MoneySaveCommunityRoom" allow="camera; microphone; fullscreen; display-capture" /> : <><span>LIVE</span><b>Community meeting</b><small>10:00–10:30 AM • 8:00–8:30 PM</small><button onClick={()=>setLiveOpen(true)}>Start live room</button></>}</div><div className="panel"><h2>Meeting rules</h2><p>Free: 10 minutes/day • Premium: 30 minutes/day.</p><p>Hosts are selected from contributors. Exact savings, income and balances are never displayed publicly.</p><p>AI moderation and human appeal/review are part of the planned moderation workflow.</p></div></div></section>}
+
+      {tab === "profile" && <section className="page"><label>ACCOUNT</label><h1>Your profile</h1><div className="panel profile"><div className="avatar">MS</div><div><h2>Money Save User</h2><p>User ID: <b>{userId}</b></p><span className="badge">{premium ? "PREMIUM USER" : "FREE USER"}</span></div></div><div className="panel"><h2>Upgrade to Premium</h2><p>Premium raises AI questions from 30/day to 100/day and live access from 10 to 30 minutes/day.</p><button onClick={()=>setTab("rewards")}>Open payment verification</button></div><div className="panel"><h2>Support</h2><p>{SUPPORT_EMAIL}</p></div></section>}
+
+      {tab === "admin" && <section className="page"><label>OWNER CONTROL</label><h1>Admin Command Center</h1><div className="notice">Owner: <b>{OWNER_EMAIL}</b> • Server-side authorization should be enforced when Supabase is connected.</div><div className="cards">{[["Users",userId],["Coins",coins.toLocaleString()],["Expenses",expenses.length],["Premium",premium?"Active":"Free"]].map(x=><div className="card" key={x[0]}><span>{x[0]}</span><strong>{x[1]}</strong><small>Live local view</small></div>)}</div><div className="panel"><h2>Verification queue</h2><p>Payment status: <b>{payment.status}</b></p><p>Reward policy: 30k → ₹10; 50k → ₹30; above 50k no extra cash tier. Claims remain subject to verification, anti-fraud checks and company policy.</p><p>Audit: every future manual adjustment should record actor, reason, timestamp and target user.</p></div></section>}
+    </main>
+
+    <nav>{nav.map(([id,name])=><button key={id} className={tab===id?"active":""} onClick={()=>setTab(id)}>{name}</button>)}</nav>
+    {toast && <div className="toast">{toast}</div>}
+    {modal && <div className="modalBackdrop" onClick={()=>setModal(null)}><div className="modal" onClick={e=>e.stopPropagation()}><h2>{modal.title}</h2>{modal.body.map((x,i)=><p key={i}>{x}</p>)}<button onClick={()=>setModal(null)}>Close</button></div></div>}
+  </div>;
 }
-createRoot(document.getElementById("root")).render(<App/>);
+
+createRoot(document.getElementById("root")).render(<App />);
