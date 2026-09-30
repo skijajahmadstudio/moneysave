@@ -40,7 +40,26 @@ function App() {
   useEffect(() => {
     if (!supabaseConfigured) return;
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, next) => setSession(next));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, next) => {
+      setSession(next);
+      if (next?.user) {
+        const fallbackUserId = "MS-" + next.user.id.slice(0, 8).toUpperCase();
+        const { data: existing } = await supabase.from("profiles").select("id").eq("id", next.user.id).maybeSingle();
+        if (!existing) {
+          await supabase.from("profiles").insert({
+            id: next.user.id,
+            user_id: fallbackUserId,
+            display_name: next.user.user_metadata?.full_name || next.user.email?.split("@")[0] || "Money Save User",
+            email: next.user.email || "",
+            role: "user",
+            subscription_tier: "free",
+            coins: 0,
+            daily_ai_questions: 0,
+            daily_ai_reset_date: new Date().toISOString().slice(0, 10),
+          });
+        }
+      }
+    });
     return () => subscription.unsubscribe();
   }, []);
 
@@ -124,6 +143,7 @@ function App() {
   const askAI = async () => {
     const asked = question.trim();
     if (!asked) return;
+    if (!session || !supabase) return notify("Sign in first so I can use your real Money Save data and AI backend.");
     if (questionsUsed >= aiLimit) return notify("Daily AI question limit reached.");
     setChat(x => [...x, { role: "user", text: asked }]);
     setQuestion("");
@@ -146,14 +166,17 @@ function App() {
       monthlyPattern: { month: monthKey, total: monthTotal, savingsRate: monthSavingsRate, topCategory: monthTop ? monthTop[0] : "Other", topCategoryShare: monthTopShare, alerts: proactiveAlerts },
     };
 
-    if (supabaseConfigured && session) {
-      try {
-        const { data, error } = await supabase.functions.invoke("ai-assistant", { body: { question: asked, context } });
-        if (!error && data?.answer) {
-          setChat(x => [...x, { role: "ai", text: data.answer }]);
-          return;
-        }
-      } catch {}
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-assistant", { body: { question: asked, context } });
+      if (!error && data?.answer) {
+        setChat(x => [...x, { role: "ai", text: data.answer }]);
+        return;
+      }
+      notify(error?.message || "AI service did not return an answer. Please try again.");
+      return;
+    } catch (e) {
+      notify("AI service is temporarily unavailable. Please try again.");
+      return;
     }
 
     const q = asked.toLowerCase();
