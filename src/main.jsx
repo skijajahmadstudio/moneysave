@@ -61,7 +61,7 @@ function App() {
   const questionsUsed = chat.filter(x => x.role === "user").length;
 
   const addExpense = (prefill = {}) => {
-    const amount = Number(prefill.amount ?? window.prompt("Expense amount (₹)") || 0);
+    const amount = Number(prefill.amount ?? (window.prompt("Expense amount (₹)") || 0));
     if (!amount) return;
     const merchant = prefill.merchant ?? window.prompt("What was it for?") ?? "Expense";
     const category = prefill.category ?? "Other";
