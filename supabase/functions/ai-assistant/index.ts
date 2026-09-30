@@ -65,10 +65,12 @@ Deno.serve(async (req) => {
     .join(", ");
   const memoryText = conversationMemory
     .map((m: any) => `${m.role === "user" ? "User" : "AI"}: ${String(m.text || "").slice(0, 500)}`)
-    .join("\n");
+    .join("
+");
   const recentText = recentExpenses
     .map((e: any) => `${e.date || "date"} — ${e.merchant || "expense"} — ${e.category || "Other"} — ₹${Math.round(Number(e.amount) || 0).toLocaleString("en-IN")}`)
-    .join("\n");
+    .join("
+");
 
   let answer =
     `Based on the information available, you have recorded ₹${Math.round(total).toLocaleString("en-IN")} in expenses and about ₹${Math.round(savings).toLocaleString("en-IN")} remaining from ₹${Math.round(income).toLocaleString("en-IN")} income. Your current savings rate is about ${savingsRate}%, and ${topCategory} is the largest recorded category. I can give a more precise diagnosis as you add more spending history.`;
@@ -82,7 +84,8 @@ Deno.serve(async (req) => {
       "Do not jump to conclusions from one transaction. Look for repeated patterns, unusually large expenses, category concentration, cash-flow pressure and goal impact when the data supports it.",
       "Do not rush to the first plausible answer. Internally work through the problem in stages: identify intent, verify the relevant numbers, inspect patterns and counterevidence, consider uncertainty and trade-offs, then answer. For substantive questions, include the conclusion, 2–3 evidence-based factors, one uncertainty or trade-off when relevant, and one practical next step.",
 
-      "Use the recent conversation memory to keep continuity, but treat current financial numbers as the source of truth. Do not invent facts that are not in the current context.",\n      "If the data is insufficient, say exactly what is missing and ask at most one focused follow-up question.",
+      "Use the recent conversation memory to keep continuity, but treat current financial numbers as the source of truth. Do not invent facts that are not in the current context.",
+      "If the data is insufficient, say exactly what is missing and ask at most one focused follow-up question.",
       "Prefer concrete numbers, comparisons and small actionable next steps. For spending questions, explain WHY the pattern matters and what could change it.",
       "For purchase decisions, assess affordability, necessity, opportunity cost and effect on the user's stated savings position; do not make the final decision for them.",
       "For investing, explain risk, fees, downside and uncertainty; never guarantee returns or present an estimate as a promise.",
@@ -98,11 +101,14 @@ Deno.serve(async (req) => {
       `Current savings rate: ${savingsRate}%`,
       `Largest category: ${topCategory}`,
       `Category breakdown: ${categoryText || "No category breakdown available"}`,
-      `Recent expenses:\n${recentText || "No recent expenses available"}`,
+      `Recent expenses:
+${recentText || "No recent expenses available"}`,
       `Coins: ${coins}; savings challenge days completed: ${challengeDays}`,
       `Monthly pattern: ${JSON.stringify(monthlyPattern)}`,
-      `Recent conversation:\n${memoryText || "No prior conversation available"}`,
-    ].join("\n");
+      `Recent conversation:
+${memoryText || "No prior conversation available"}`,
+    ].join("
+");
 
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
