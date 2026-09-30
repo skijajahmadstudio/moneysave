@@ -18,11 +18,11 @@ const uid = () => "MS-" + Math.random().toString(36).slice(2, 10).toUpperCase();
 function App() {
   const [session, setSession] = useState(null);
   const [tab, setTab] = useState("home");
-  const [income, setIncome] = useState(() => Number(localStorage.getItem("ms_income") || 42000));
-  const [expenses, setExpenses] = useState(() => JSON.parse(localStorage.getItem("ms_expenses") || "null") || seedExpenses);
-  const [coins, setCoins] = useState(() => Number(localStorage.getItem("ms_coins") || 18400));
-  const [premium, setPremium] = useState(() => localStorage.getItem("ms_premium") === "true");
-  const [userId] = useState(() => localStorage.getItem("ms_uid") || uid());
+  const [income, setIncome] = useState(0);
+  const [expenses, setExpenses] = useState([]);
+  const [coins, setCoins] = useState(0);
+  const [premium, setPremium] = useState(false);
+  const [userId, setUserId] = useState("");
   const [question, setQuestion] = useState("");
   const [chat, setChat] = useState(() => JSON.parse(localStorage.getItem("ms_chat") || "null") || [{ role: "ai", text: "Hello! I’m your AI Financial Friend. Ask me about spending, saving, goals, or a purchase." }]);
   const [toast, setToast] = useState("");
@@ -31,19 +31,9 @@ function App() {
   const [research, setResearch] = useState({ type: "stock", name: "", amount: 10000, years: 5, rate: 10, risk: "medium" });
   const [business, setBusiness] = useState({ capital: 10000, skill: "online sales" });
   const [payment, setPayment] = useState({ reference: "", file: null, status: "Not submitted" });
-  const [challengeDays, setChallengeDays] = useState(() => Number(localStorage.getItem("ms_challenge") || 4));
+  const [challengeDays, setChallengeDays] = useState(0);
   const [checkin, setCheckin] = useState({ amount: "", purpose: "", need: "yes" });
-  const [liveOpen, setLiveOpen] = useState(false);
-
-  useEffect(() => {
-    localStorage.setItem("ms_uid", userId);
-    localStorage.setItem("ms_income", income);
-    localStorage.setItem("ms_expenses", JSON.stringify(expenses));
-    localStorage.setItem("ms_coins", coins);
-    localStorage.setItem("ms_premium", premium);
-    localStorage.setItem("ms_challenge", challengeDays);
-    localStorage.setItem("ms_chat", JSON.stringify(chat.slice(-20)));
-  }, [userId, income, expenses, coins, premium, challengeDays]);
+  const [liveOpen, setLiveOpen] = useState(false);\n  const [goal, setGoal] = useState(null);
 
   useEffect(() => {
     if (!supabaseConfigured) return;
@@ -51,6 +41,30 @@ function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, next) => setSession(next));
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!session || !supabase) return;
+    let cancelled = false;
+    (async () => {
+      const [profileRes, expensesRes, incomesRes, goalsRes] = await Promise.all([
+        supabase.from("profiles").select("user_id,coins,subscription_tier").eq("id", session.user.id).single(),
+        supabase.from("expenses").select("id,merchant,category,amount,spent_at,notes").eq("user_id", session.user.id).order("spent_at", { ascending: false }).limit(500),
+        supabase.from("incomes").select("id,source,amount,received_at").eq("user_id", session.user.id).order("received_at", { ascending: false }).limit(100),
+        supabase.from("savings_goals").select("id,title,target_amount,current_amount,target_date").eq("user_id", session.user.id).order("created_at", { ascending: false }).limit(1),
+      ]);
+      if (cancelled) return;
+      if (profileRes.data) {
+        setUserId(profileRes.data.user_id);
+        setCoins(Number(profileRes.data.coins || 0));
+        setPremium(profileRes.data.subscription_tier === "premium");
+      }
+      if (expensesRes.data) setExpenses(expensesRes.data.map(e => ({ ...e, date: e.spent_at, amount: Number(e.amount) })));
+      if (incomesRes.data) setIncome(incomesRes.data.reduce((s, e) => s + Number(e.amount || 0), 0));
+      if (goalsRes.data?.[0]) setGoal(goalsRes.data[0]);
+    })();
+    return () => { cancelled = true; };
+  }, [session]);
+
 
   const notify = text => { setToast(text); window.clearTimeout(window.__msToast); window.__msToast = window.setTimeout(() => setToast(""), 2800); };
   const total = expenses.reduce((s, e) => s + Number(e.amount), 0);
@@ -74,14 +88,22 @@ function App() {
   if (largestRecent && income > 0 && Number(largestRecent.amount) >= income * 0.1) proactiveAlerts.push(`${largestRecent.merchant} is a large single expense at ${money(largestRecent.amount)}.`);
   const questionsUsed = chat.filter(x => x.role === "user").length;
 
-  const addExpense = (prefill = {}) => {
+  const addExpense = async (prefill = {}) => {
+    if (!session || !supabase) return notify("Please sign in first.");
     const amount = Number(prefill.amount ?? (window.prompt("Expense amount (₹)") || 0));
-    if (!amount) return;
+    if (!amount || amount <= 0) return;
     const merchant = prefill.merchant ?? window.prompt("What was it for?") ?? "Expense";
     const category = prefill.category ?? "Other";
-    setExpenses(x => [{ id: Date.now().toString(), merchant, category, amount, date: today() }, ...x]);
-    setCoins(x => Math.min(50000, x + 250));
-    notify("Expense saved • 250 coins added for review");
+    const { data, error } = await supabase.from("expenses").insert({
+      user_id: session.user.id, merchant, category, amount, spent_at: today()
+    }).select("id,merchant,category,amount,spent_at").single();
+    if (error) return notify(error.message);
+    setExpenses(x => [{ ...data, date: data.spent_at, amount: Number(data.amount) }, ...x]);
+    const { data: newBalance, error: coinError } = await supabase.rpc("apply_coin_ledger", {
+      p_user_id: session.user.id, p_amount: 250, p_source: "saving", p_reason: "Expense logged for verified spending record", p_reference_id: data.id
+    });
+    if (!coinError && Number.isFinite(Number(newBalance))) setCoins(Number(newBalance));
+    notify("Expense saved securely.");
   };
 
   const askAI = async () => {
@@ -265,7 +287,7 @@ function App() {
 
       {tab === "research" && <section className="page"><label>AI RESEARCH</label><h1>Investment & income research.</h1><div className="cols"><div className="panel"><h2>Investment research calculator</h2><p>Compare a hypothetical stock, mutual fund, FD, gold or ETF scenario. No guarantees.</p><div className="formGrid"><select value={research.type} onChange={e=>setResearch({...research,type:e.target.value})}><option>stock</option><option>mutual fund</option><option>FD</option><option>gold</option><option>ETF</option></select><input value={research.name} onChange={e=>setResearch({...research,name:e.target.value})} placeholder="Name / symbol"/><input type="number" value={research.amount} onChange={e=>setResearch({...research,amount:e.target.value})} placeholder="Amount"/><input type="number" value={research.years} onChange={e=>setResearch({...research,years:e.target.value})} placeholder="Years"/><input type="number" value={research.rate} onChange={e=>setResearch({...research,rate:e.target.value})} placeholder="Illustrative %"/><select value={research.risk} onChange={e=>setResearch({...research,risk:e.target.value})}><option>low</option><option>medium</option><option>high</option></select></div><button onClick={runResearch}>Analyze scenario</button><button className="secondary" onClick={()=>window.open("https://www.google.com/search?q="+encodeURIComponent((research.name||research.type)+" latest fees risk India"),"_blank")}>Open live research</button></div><div className="panel"><h2>Business / income ideas</h2><p>Generate a practical starting plan from your capital and skills.</p><div className="formGrid"><input type="number" value={business.capital} onChange={e=>setBusiness({...business,capital:e.target.value})} placeholder="Capital ₹"/><input value={business.skill} onChange={e=>setBusiness({...business,skill:e.target.value})} placeholder="Your skill"/></div><button onClick={runBusiness}>Create plan</button></div></div></section>}
 
-      {tab === "rewards" && <section className="page"><label>REWARDS</label><h1>Reward & verification</h1><div className="cols"><div className="panel"><h2>30,000 coins</h2><strong className="reward">₹10</strong><p>Eligibility only; verification and policy review apply.</p><button onClick={()=>claimReward(30000)}>Submit claim</button></div><div className="panel"><h2>50,000 coins</h2><strong className="reward">₹30</strong><p>No extra cash tier above 50,000 coins.</p><button onClick={()=>claimReward(50000)}>Submit claim</button></div></div><div className="panel"><h2>Premium activation</h2><p>Submit your PhonePe payment reference or screenshot. Automated review is followed by human verification.</p><div className="formGrid"><input value={payment.reference} onChange={e=>setPayment({...payment,reference:e.target.value})} placeholder="PhonePe transaction/reference ID"/><label className="upload"><input type="file" accept="image/*" onChange={e=>setPayment({...payment,file:e.target.files?.[0]})}/>Upload payment screenshot</label></div><p>Status: <b>{payment.status}</b></p><button onClick={submitPayment}>Submit for verification</button><button className="secondary" onClick={()=>{setPremium(true);notify("Premium demo mode enabled locally. Real approval still requires verification.")}}>Demo Premium</button></div></section>}
+      {tab === "rewards" && <section className="page"><label>REWARDS</label><h1>Reward & verification</h1><div className="cols"><div className="panel"><h2>30,000 coins</h2><strong className="reward">₹10</strong><p>Eligibility only; verification and policy review apply.</p><button onClick={()=>claimReward(30000)}>Submit claim</button></div><div className="panel"><h2>50,000 coins</h2><strong className="reward">₹30</strong><p>No extra cash tier above 50,000 coins.</p><button onClick={()=>claimReward(50000)}>Submit claim</button></div></div><div className="panel"><h2>Premium activation</h2><p>Submit your PhonePe payment reference or screenshot. Automated review is followed by human verification.</p><div className="formGrid"><input value={payment.reference} onChange={e=>setPayment({...payment,reference:e.target.value})} placeholder="PhonePe transaction/reference ID"/><label className="upload"><input type="file" accept="image/*" onChange={e=>setPayment({...payment,file:e.target.files?.[0]})}/>Upload payment screenshot</label></div><p>Status: <b>{payment.status}</b></p><button onClick={submitPayment}>Submit for verification</button></div></section>}
 
       {tab === "live" && <section className="page"><label>LIVE MEETING GATEWAY</label><h1>Learn from top savers.</h1><div className="live"><div className="video liveBox">{liveOpen ? <iframe title="Money Save Live" src="https://meet.jit.si/MoneySaveCommunityRoom" allow="camera; microphone; fullscreen; display-capture" /> : <><span>LIVE</span><b>Community meeting</b><small>10:00–10:30 AM • 8:00–8:30 PM</small><button onClick={()=>setLiveOpen(true)}>Start live room</button></>}</div><div className="panel"><h2>Meeting rules</h2><p>Free: 10 minutes/day • Premium: 30 minutes/day.</p><p>Hosts are selected from contributors. Exact savings, income and balances are never displayed publicly.</p><p>AI moderation and human appeal/review are part of the planned moderation workflow.</p></div></div></section>}
 
