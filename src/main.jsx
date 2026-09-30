@@ -56,9 +56,11 @@ function App() {
       ]);
       if (cancelled) return;
       if (profileRes.data) {
-        setUserId(profileRes.data.user_id);
+        setUserId(profileRes.data.user_id || ("MS-" + session.user.id.slice(0, 8).toUpperCase()));
         setCoins(Number(profileRes.data.coins || 0));
         setPremium(profileRes.data.subscription_tier === "premium");
+      } else {
+        setUserId("MS-" + session.user.id.slice(0, 8).toUpperCase());
       }
       if (expensesRes.data) setExpenses(expensesRes.data.map(e => ({ ...e, date: e.spent_at, amount: Number(e.amount) })));
       if (incomesRes.data) setIncome(incomesRes.data.reduce((s, e) => s + Number(e.amount || 0), 0));
@@ -158,12 +160,31 @@ function App() {
       answer += isBengali
         ? ` প্রতি expense entry-তে গড় খরচ প্রায় ${money(avgRecent)}। essentials ও discretionary খরচ আলাদা করে সবচেয়ে বড় category-র জন্য weekly cap সেট করা ভালো পরবর্তী ধাপ।`
         : `Your recorded average expense is about ${money(avgRecent)} per entry. A useful next step is to separate essentials from discretionary spending and set a weekly cap for the largest category.`;
+    } else if (/salary|income|আয়|ইনকাম|বেতন/.test(q)) {
+      const suggested = Math.max(0, income - total);
+      answer += isBengali
+        ? `আপনার রেকর্ড অনুযায়ী আয় ${money(income)} এবং খরচ ${money(total)}; পার্থক্য ${money(suggested)}। আপনি চাইলে আমি এই টাকাটা emergency fund, goal এবং discretionary budget-এ ভাগ করে একটি মাসিক plan বানাতে পারি।`
+        : `Your recorded income is ${money(income)} and spending is ${money(total)}, leaving about ${money(suggested)} before other unrecorded costs. I can turn that into a monthly emergency-fund, goal and discretionary budget plan.`;
+    } else if (/emergency|জরুরি|ফান্ড/.test(q)) {
+      const monthlyNeed = Math.max(monthTotal, total, 0);
+      const target = Math.round(monthlyNeed * 3);
+      answer += isBengali
+        ? `আপনার বর্তমান recorded spending ${money(monthlyNeed)} ধরে ৩ মাসের একটি illustrative emergency-fund target প্রায় ${money(target)}। আপনার বাস্তব essential monthly cost জানলে target আরও নির্ভুল হবে।`
+        : `Using your recorded spending of ${money(monthlyNeed)} as a rough baseline, a 3-month illustrative emergency-fund target is about ${money(target)}. It becomes more accurate if we separate essential monthly costs from discretionary spending.`;
+    } else if (/invest|stock|mutual|fd|gold|শেয়ার|মিউচুয়াল|বিনিয়োগ/.test(q)) {
+      answer += isBengali
+        ? " বিনিয়োগের ক্ষেত্রে আমি return-এর পাশাপাশি downside, fees, tax, liquidity এবং আপনার সময়সীমা দেখব। শুধু একটি সম্ভাব্য return দেখে সিদ্ধান্ত নেওয়া উচিত নয়।"
+        : "For investing, I would compare potential return with downside risk, fees, taxes, liquidity and your time horizon. A possible return alone is not enough to evaluate an investment.";
+    } else if (/debt|loan|ঋণ|লোন|কিস্তি/.test(q)) {
+      answer += isBengali
+        ? " ঋণ নিয়ে বললে বাকি principal, interest rate, EMI এবং due date দরকার। এগুলো দিলে আমি interest cost, cash-flow pressure এবং repayment options তুলনা করে দেখাতে পারি।"
+        : "For debt, the key inputs are outstanding principal, interest rate, EMI and due date. With those, I can compare interest cost, cash-flow pressure and repayment options.";
     } else {
       answer += top
         ? (isBengali
-          ? ` সবচেয়ে শক্তিশালী বর্তমান signal হলো ${top[0]} — ${money(topAmount)}, মোট recorded spending-এর প্রায় ${topShare}%। আপনি যে নির্দিষ্ট লক্ষ্য বা সিদ্ধান্ত নিয়ে ভাবছেন সেটি বললে আমি আরও নির্দিষ্টভাবে হিসাব মিলিয়ে বলব।`
-          : `The strongest current signal is ${top[0]} at ${money(topAmount)}, representing about ${topShare}% of recorded spending. I can give a more precise answer if you tell me the specific goal or decision you are considering.`)
-        : (isBengali ? " আপনি যে নির্দিষ্ট money decision বা goal নিয়ে ভাবছেন সেটি বলুন; আমি আপনার বর্তমান সংখ্যার সঙ্গে মিলিয়ে দেখব।" : "Tell me the specific money decision or goal and I’ll connect it to your current numbers.");
+          ? `আপনার বর্তমান ডেটায় ${top[0]} সবচেয়ে বড় category: ${money(topAmount)} (${topShare}%)। মোট সঞ্চয় ${money(savings)}। এই তথ্য থেকে সবচেয়ে ব্যবহারযোগ্য পরবর্তী পদক্ষেপ হলো ${top[0]}-এর recurring খরচ আলাদা করে দেখা এবং একটি সীমা সেট করা।`
+          : `Your largest recorded category is ${top[0]} at ${money(topAmount)} (${topShare}%), with about ${money(savings)} remaining from the recorded income. A useful next step is to identify recurring ${top[0]} spending and set a clear limit.`)
+        : (isBengali ? "আপনার প্রশ্নটি বুঝেছি। নির্দিষ্ট amount, goal বা expense-এর নাম দিলে আমি সরাসরি হিসাব করে বলব।" : "I understand the question. Give me the amount, goal or expense involved and I’ll calculate the relevant trade-offs directly.");
     }
 
     if (supabaseConfigured && session) {
