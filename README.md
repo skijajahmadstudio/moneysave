@@ -2,6 +2,9 @@
 
 Save • Secure • Grow
 
+## Live app
+GitHub Pages deployment for the Money Save web app.
+
 ## Product foundation
 Money Save is a personal finance platform focused on saving, protecting money and understanding future growth.
 
@@ -33,7 +36,7 @@ Money Save is a personal finance platform focused on saving, protecting money an
 1. Authentication and unique User ID
 2. Supabase/Postgres data layer with row-level security
 3. Server-side Owner/Verification/Support roles
-4. Real AI provider and usage quotas
+4. Server-side AI provider and usage quotas
 5. Receipt OCR and secure private document storage
 6. PhonePe payment submission and human verification workflow
 7. Coin ledger and anti-abuse controls
