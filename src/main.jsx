@@ -89,6 +89,7 @@ function App() {
 
     const asked = question;
     const q = asked.toLowerCase();
+    const isBengali = /[\u0980-\u09FF]/.test(asked);
     const savingsRate = income > 0 ? Math.round((savings / income) * 100) : 0;
     const topAmount = top ? Number(top[1]) : 0;
     const topShare = total > 0 ? Math.round((topAmount / total) * 100) : 0;
@@ -152,7 +153,9 @@ function App() {
               coins,
               premium,
               challengeDays,
-              dailyCheckin: checkin,\n              conversationMemory: chat.slice(-8),\n              monthlyPattern: { month: monthKey, total: monthTotal, savingsRate: monthSavingsRate, topCategory: monthTop ? monthTop[0] : "Other", topCategoryShare: monthTopShare, alerts: proactiveAlerts },
+              dailyCheckin: checkin,
+              conversationMemory: chat.slice(-8),
+              monthlyPattern: { month: monthKey, total: monthTotal, savingsRate: monthSavingsRate, topCategory: monthTop ? monthTop[0] : "Other", topCategoryShare: monthTopShare, alerts: proactiveAlerts },
             },
           },
         });
