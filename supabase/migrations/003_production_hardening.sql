@@ -1,6 +1,10 @@
 -- Production hardening for Money Save
 -- Apply after 001 and 002.
 
+create or replace function public.is_owner()
+returns boolean language sql stable security definer set search_path = public
+as $ select exists(select 1 from public.profiles where id = auth.uid() and role = 'owner') $;
+
 create or replace function public.apply_coin_ledger(
   p_user_id uuid,
   p_amount integer,
@@ -12,7 +16,7 @@ returns integer
 language plpgsql
 security definer
 set search_path = public
-as $$
+as $
 declare new_balance integer;
 begin
   if auth.uid() is null then
@@ -32,7 +36,7 @@ begin
   returning coins into new_balance;
   return new_balance;
 end;
-$$;
+$;
 
 revoke all on function public.apply_coin_ledger(uuid,integer,public.coin_source,text,uuid) from public;
 grant execute on function public.apply_coin_ledger(uuid,integer,public.coin_source,text,uuid) to authenticated;
@@ -93,6 +97,3 @@ $$;
 revoke all on function public.claim_reward(integer,text,text,text,text) from public;
 grant execute on function public.claim_reward(integer,text,text,text,text) to authenticated;
 
-create or replace function public.is_owner()
-returns boolean language sql stable security definer set search_path = public
-as $$ select exists(select 1 from public.profiles where id = auth.uid() and role = 'owner') $$;
