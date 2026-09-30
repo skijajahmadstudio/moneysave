@@ -41,7 +41,8 @@ function App() {
     localStorage.setItem("ms_expenses", JSON.stringify(expenses));
     localStorage.setItem("ms_coins", coins);
     localStorage.setItem("ms_premium", premium);
-    localStorage.setItem("ms_challenge", challengeDays);\n    localStorage.setItem("ms_chat", JSON.stringify(chat.slice(-20)));
+    localStorage.setItem("ms_challenge", challengeDays);
+    localStorage.setItem("ms_chat", JSON.stringify(chat.slice(-20)));
   }, [userId, income, expenses, coins, premium, challengeDays]);
 
   useEffect(() => {
