@@ -76,10 +76,31 @@ function App() {
 
     const asked = question;
     const q = asked.toLowerCase();
-    let answer = `You recorded ${money(total)} of expenses and about ${money(savings)} remains from the current income.`;
-    if (/save|saving|reduce|কম|বাঁচ/.test(q)) answer = `Your largest recorded category is ${top ? top[0] : "Other"} at ${money(top ? top[1] : 0)}. Try a weekly cap, delay non-essential purchases by 24 hours, and review that category first.`;
-    if (/why|ran out|শেষ|খরচ/.test(q)) answer = `The current numbers show ${money(total)} spent. ${top ? top[0] + " is your largest category." : "There is not enough category data yet."} Add every daily expense so I can spot patterns.`;
-    if (/purchase|buy|কিনব|কেনা/.test(q)) answer = "I can help compare the purchase with your budget and goal. Tell me the price, purpose, and whether it is essential.";
+    const savingsRate = income > 0 ? Math.round((savings / income) * 100) : 0;
+    const topAmount = top ? Number(top[1]) : 0;
+    const topShare = total > 0 ? Math.round((topAmount / total) * 100) : 0;
+    const recentTotal = expenses.slice(0, 5).reduce((sum, e) => sum + Number(e.amount || 0), 0);
+    const avgRecent = expenses.length ? Math.round(total / expenses.length) : 0;
+
+    let answer = `I checked your current numbers: income ${money(income)}, recorded spending ${money(total)}, estimated savings ${money(savings)}, and a ${savingsRate}% savings rate. `;
+    if (!expenses.length) {
+      answer += "I need a little more spending history before I can identify a reliable pattern.";
+    } else if (/why|ran out|শেষ|কোথায়|কেন/.test(q)) {
+      answer += top
+        ? `${top[0]} is currently your largest category at ${money(topAmount)} (${topShare}% of recorded spending). The recent 5 expenses total ${money(recentTotal)}. That suggests we should inspect repeated spending rather than blame one purchase.`
+        : "Your spending history is still too small to identify a strong pattern.";
+    } else if (/save|saving|reduce|কম|বাঁচ|সঞ্চয়/.test(q)) {
+      const target = Math.max(0, Math.round(income * 0.1));
+      answer += `A practical next target is to protect at least ${money(target)} this month before discretionary spending. Start by reviewing ${top ? top[0] : "your largest category"} and setting a weekly limit. Your current savings are ${money(savings)}.`;
+    } else if (/purchase|buy|কিনব|কেনা|কেনবো/.test(q)) {
+      answer += "For a purchase decision, I need the price and purpose. I will compare it with your current cash position, savings target and recent spending pattern instead of judging the purchase from price alone.";
+    } else if (/budget|plan|বাজেট|পরিকল্পনা/.test(q)) {
+      answer += `Your recorded average expense is about ${money(avgRecent)} per entry. A useful next step is to separate essentials from discretionary spending and set a weekly cap for the largest category.`;
+    } else {
+      answer += top
+        ? `The strongest current signal is ${top[0]} at ${money(topAmount)}, representing about ${topShare}% of recorded spending. I can give a more precise answer if you tell me the specific goal or decision you are considering.`
+        : "Tell me the specific money decision or goal and I’ll connect it to your current numbers.";
+    }
 
     if (supabaseConfigured && session) {
       try {
