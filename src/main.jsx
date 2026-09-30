@@ -71,7 +71,6 @@ function App() {
   if (monthTop && monthTopShare >= 35) proactiveAlerts.push(`${monthTop[0]} is ${monthTopShare}% of this month’s recorded spending.`);
   const largestRecent = [...monthExpenses].sort((a, b) => Number(b.amount) - Number(a.amount))[0];
   if (largestRecent && income > 0 && Number(largestRecent.amount) >= income * 0.1) proactiveAlerts.push(`${largestRecent.merchant} is a large single expense at ${money(largestRecent.amount)}.`);
-  const aiLimit = premium ? 100 : 30;
   const questionsUsed = chat.filter(x => x.role === "user").length;
 
   const addExpense = (prefill = {}) => {
