@@ -30,7 +30,7 @@ function App() {
   const [receipt, setReceipt] = useState(null);
   const [research, setResearch] = useState({ type: "stock", name: "", amount: 10000, years: 5, rate: 10, risk: "medium" });
   const [business, setBusiness] = useState({ capital: 10000, skill: "online sales" });
-  const [payment, setPayment] = useState({ reference: "", file: null, status: "Not submitted" });\n  const [paymentQueue, setPaymentQueue] = useState([]);
+  const [payment, setPayment] = useState({ reference: "", amount: "", file: null, status: "Not submitted" });\n  const [paymentQueue, setPaymentQueue] = useState([]);
   const [challengeDays, setChallengeDays] = useState(0);
   const [checkin, setCheckin] = useState({ amount: "", purpose: "", need: "yes" });
   const [liveOpen, setLiveOpen] = useState(false);\n  const [goal, setGoal] = useState(null);
@@ -240,7 +240,7 @@ function App() {
 
   const submitPayment = async () => {
     if (!session || !supabase) return notify("Please sign in first.");
-    if (!payment.reference && !payment.file) return notify("Add a transaction reference or payment screenshot.");
+    if (!payment.reference && !payment.file) return notify("Add a transaction reference or payment screenshot.");\n    const paymentAmount = Number(payment.amount || 0);\n    if (!paymentAmount || paymentAmount <= 0) return notify("Enter the amount you paid.");
     let screenshotBase64 = "";
     if (payment.file) {
       if (!payment.file.type.startsWith("image/")) return notify("Please upload an image.");
@@ -256,7 +256,7 @@ function App() {
     const { data, error } = await supabase.functions.invoke("submit-payment", {
       body: {
         plan: "premium",
-        amount: 0,
+        amount: paymentAmount,
         transactionReference: payment.reference,
         screenshotBase64,
         fileName: payment.file?.name || "payment.jpg",
@@ -320,7 +320,7 @@ function App() {
 
       {tab === "research" && <section className="page"><label>AI RESEARCH</label><h1>Investment & income research.</h1><div className="cols"><div className="panel"><h2>Investment research calculator</h2><p>Compare a hypothetical stock, mutual fund, FD, gold or ETF scenario. No guarantees.</p><div className="formGrid"><select value={research.type} onChange={e=>setResearch({...research,type:e.target.value})}><option>stock</option><option>mutual fund</option><option>FD</option><option>gold</option><option>ETF</option></select><input value={research.name} onChange={e=>setResearch({...research,name:e.target.value})} placeholder="Name / symbol"/><input type="number" value={research.amount} onChange={e=>setResearch({...research,amount:e.target.value})} placeholder="Amount"/><input type="number" value={research.years} onChange={e=>setResearch({...research,years:e.target.value})} placeholder="Years"/><input type="number" value={research.rate} onChange={e=>setResearch({...research,rate:e.target.value})} placeholder="Illustrative %"/><select value={research.risk} onChange={e=>setResearch({...research,risk:e.target.value})}><option>low</option><option>medium</option><option>high</option></select></div><button onClick={runResearch}>Analyze scenario</button><button className="secondary" onClick={()=>window.open("https://www.google.com/search?q="+encodeURIComponent((research.name||research.type)+" latest fees risk India"),"_blank")}>Open live research</button></div><div className="panel"><h2>Business / income ideas</h2><p>Generate a practical starting plan from your capital and skills.</p><div className="formGrid"><input type="number" value={business.capital} onChange={e=>setBusiness({...business,capital:e.target.value})} placeholder="Capital ₹"/><input value={business.skill} onChange={e=>setBusiness({...business,skill:e.target.value})} placeholder="Your skill"/></div><button onClick={runBusiness}>Create plan</button></div></div></section>}
 
-      {tab === "rewards" && <section className="page"><label>REWARDS</label><h1>Reward & verification</h1><div className="cols"><div className="panel"><h2>30,000 coins</h2><strong className="reward">₹10</strong><p>Eligibility only; verification and policy review apply.</p><button onClick={()=>claimReward(30000)}>Submit claim</button></div><div className="panel"><h2>50,000 coins</h2><strong className="reward">₹30</strong><p>No extra cash tier above 50,000 coins.</p><button onClick={()=>claimReward(50000)}>Submit claim</button></div></div><div className="panel"><h2>Premium activation</h2><p>Submit your PhonePe payment reference or screenshot. Automated review is followed by human verification.</p><div className="formGrid"><input value={payment.reference} onChange={e=>setPayment({...payment,reference:e.target.value})} placeholder="PhonePe transaction/reference ID"/><label className="upload"><input type="file" accept="image/*" onChange={e=>setPayment({...payment,file:e.target.files?.[0]})}/>Upload payment screenshot</label></div><p>Status: <b>{payment.status}</b></p><button onClick={submitPayment}>Submit for verification</button></div></section>}
+      {tab === "rewards" && <section className="page"><label>REWARDS</label><h1>Reward & verification</h1><div className="cols"><div className="panel"><h2>30,000 coins</h2><strong className="reward">₹10</strong><p>Eligibility only; verification and policy review apply.</p><button onClick={()=>claimReward(30000)}>Submit claim</button></div><div className="panel"><h2>50,000 coins</h2><strong className="reward">₹30</strong><p>No extra cash tier above 50,000 coins.</p><button onClick={()=>claimReward(50000)}>Submit claim</button></div></div><div className="panel"><h2>Premium activation</h2><p>Submit your PhonePe payment reference or screenshot. Automated review is followed by human verification.</p><div className="formGrid"><input type="number" min="1" step="0.01" value={payment.amount} onChange={e=>setPayment({...payment,amount:e.target.value})} placeholder="Amount paid (₹)"/><input value={payment.reference} onChange={e=>setPayment({...payment,reference:e.target.value})} placeholder="PhonePe transaction/reference ID"/><label className="upload"><input type="file" accept="image/*" onChange={e=>setPayment({...payment,file:e.target.files?.[0]})}/>Upload payment screenshot</label></div><p>Status: <b>{payment.status}</b></p><button onClick={submitPayment}>Submit for verification</button></div></section>}
 
       {tab === "live" && <section className="page"><label>LIVE MEETING GATEWAY</label><h1>Learn from top savers.</h1><div className="live"><div className="video liveBox">{liveOpen ? <iframe title="Money Save Live" src="https://meet.jit.si/MoneySaveCommunityRoom" allow="camera; microphone; fullscreen; display-capture" /> : <><span>LIVE</span><b>Community meeting</b><small>10:00–10:30 AM • 8:00–8:30 PM</small><button onClick={()=>setLiveOpen(true)}>Start live room</button></>}</div><div className="panel"><h2>Meeting rules</h2><p>Free: 10 minutes/day • Premium: 30 minutes/day.</p><p>Hosts are selected from contributors. Exact savings, income and balances are never displayed publicly.</p><p>AI moderation and human appeal/review are part of the planned moderation workflow.</p></div></div></section>}
 
