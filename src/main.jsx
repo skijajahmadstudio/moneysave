@@ -95,24 +95,38 @@ function App() {
     const recentTotal = expenses.slice(0, 5).reduce((sum, e) => sum + Number(e.amount || 0), 0);
     const avgRecent = expenses.length ? Math.round(total / expenses.length) : 0;
 
-    let answer = `I checked your current numbers: income ${money(income)}, recorded spending ${money(total)}, estimated savings ${money(savings)}, and a ${savingsRate}% savings rate. `;
+    let answer = isBengali
+      ? `আমি আগে আপনার বর্তমান হিসাব মিলিয়ে দেখছি: আয় ${money(income)}, রেকর্ড করা খরচ ${money(total)}, আনুমানিক সঞ্চয় ${money(savings)}, এবং সঞ্চয়ের হার ${savingsRate}%।`
+      : `I checked your current numbers: income ${money(income)}, recorded spending ${money(total)}, estimated savings ${money(savings)}, and a ${savingsRate}% savings rate.`;
     if (!expenses.length) {
-      answer += "I need a little more spending history before I can identify a reliable pattern.";
+      answer += isBengali
+        ? " নির্ভরযোগ্য খরচের ধরণ ধরতে আরও কিছু spending history দরকার।"
+        : " I need a little more spending history before I can identify a reliable pattern.";
     } else if (/why|ran out|শেষ|কোথায়|কেন/.test(q)) {
       answer += top
-        ? `${top[0]} is currently your largest category at ${money(topAmount)} (${topShare}% of recorded spending). The recent 5 expenses total ${money(recentTotal)}. That suggests we should inspect repeated spending rather than blame one purchase.`
-        : "Your spending history is still too small to identify a strong pattern.";
+        ? (isBengali
+          ? ` এখন আপনার সবচেয়ে বড় খরচের বিভাগ ${top[0]} — ${money(topAmount)}, অর্থাৎ মোট রেকর্ড করা খরচের ${topShare}%। সাম্প্রতিক ৫টি খরচ মিলিয়ে ${money(recentTotal)}। তাই একটি মাত্র কেনাকাটাকে দোষ না দিয়ে পুনরাবৃত্ত খরচের ধরণ দেখা বেশি যুক্তিযুক্ত।`
+          : ` ${top[0]} is currently your largest category at ${money(topAmount)} (${topShare}% of recorded spending). The recent 5 expenses total ${money(recentTotal)}. That suggests we should inspect repeated spending rather than blame one purchase.`)
+        : (isBengali ? " আপনার খরচের ইতিহাস এখনও খুব ছোট, তাই শক্তিশালী pattern বলা যাচ্ছে না।" : " Your spending history is still too small to identify a strong pattern.");
     } else if (/save|saving|reduce|কম|বাঁচ|সঞ্চয়/.test(q)) {
       const target = Math.max(0, Math.round(income * 0.1));
-      answer += `A practical next target is to protect at least ${money(target)} this month before discretionary spending. Start by reviewing ${top ? top[0] : "your largest category"} and setting a weekly limit. Your current savings are ${money(savings)}.`;
+      answer += isBengali
+        ? ` একটি বাস্তবসম্মত পরবর্তী লক্ষ্য হলো এই মাসে discretionary খরচের আগে অন্তত ${money(target)} আলাদা করে রাখা। আগে ${top ? top[0] : "সবচেয়ে বড় খরচের বিভাগ"} দেখুন এবং সাপ্তাহিক সীমা ঠিক করুন। বর্তমানে আনুমানিক সঞ্চয় ${money(savings)}।`
+        : `A practical next target is to protect at least ${money(target)} this month before discretionary spending. Start by reviewing ${top ? top[0] : "your largest category"} and setting a weekly limit. Your current savings are ${money(savings)}.`;
     } else if (/purchase|buy|কিনব|কেনা|কেনবো/.test(q)) {
-      answer += "For a purchase decision, I need the price and purpose. I will compare it with your current cash position, savings target and recent spending pattern instead of judging the purchase from price alone.";
+      answer += isBengali
+        ? " কেনাকাটার সিদ্ধান্তে দাম ও উদ্দেশ্য জানালে আমি আপনার বর্তমান cash position, সঞ্চয়ের লক্ষ্য এবং সাম্প্রতিক খরচের ধরণ মিলিয়ে দেখব—শুধু দামের ভিত্তিতে বিচার করব না।"
+        : " For a purchase decision, I need the price and purpose. I will compare it with your current cash position, savings target and recent spending pattern instead of judging the purchase from price alone.";
     } else if (/budget|plan|বাজেট|পরিকল্পনা/.test(q)) {
-      answer += `Your recorded average expense is about ${money(avgRecent)} per entry. A useful next step is to separate essentials from discretionary spending and set a weekly cap for the largest category.`;
+      answer += isBengali
+        ? ` প্রতি expense entry-তে গড় খরচ প্রায় ${money(avgRecent)}। essentials ও discretionary খরচ আলাদা করে সবচেয়ে বড় category-র জন্য weekly cap সেট করা ভালো পরবর্তী ধাপ।`
+        : `Your recorded average expense is about ${money(avgRecent)} per entry. A useful next step is to separate essentials from discretionary spending and set a weekly cap for the largest category.`;
     } else {
       answer += top
-        ? `The strongest current signal is ${top[0]} at ${money(topAmount)}, representing about ${topShare}% of recorded spending. I can give a more precise answer if you tell me the specific goal or decision you are considering.`
-        : "Tell me the specific money decision or goal and I’ll connect it to your current numbers.";
+        ? (isBengali
+          ? ` সবচেয়ে শক্তিশালী বর্তমান signal হলো ${top[0]} — ${money(topAmount)}, মোট recorded spending-এর প্রায় ${topShare}%। আপনি যে নির্দিষ্ট লক্ষ্য বা সিদ্ধান্ত নিয়ে ভাবছেন সেটি বললে আমি আরও নির্দিষ্টভাবে হিসাব মিলিয়ে বলব।`
+          : `The strongest current signal is ${top[0]} at ${money(topAmount)}, representing about ${topShare}% of recorded spending. I can give a more precise answer if you tell me the specific goal or decision you are considering.`)
+        : (isBengali ? " আপনি যে নির্দিষ্ট money decision বা goal নিয়ে ভাবছেন সেটি বলুন; আমি আপনার বর্তমান সংখ্যার সঙ্গে মিলিয়ে দেখব।" : "Tell me the specific money decision or goal and I’ll connect it to your current numbers.");
     }
 
     if (supabaseConfigured && session) {
