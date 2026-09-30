@@ -88,6 +88,17 @@ function App() {
   if (largestRecent && income > 0 && Number(largestRecent.amount) >= income * 0.1) proactiveAlerts.push(`${largestRecent.merchant} is a large single expense at ${money(largestRecent.amount)}.`);
   const questionsUsed = chat.filter(x => x.role === "user").length;
 
+  const addIncome = async () => {
+    if (!session || !supabase) return notify("Please sign in first.");
+    const amount = Number(window.prompt("Income amount (₹)") || 0);
+    if (!amount || amount <= 0) return;
+    const source = window.prompt("Income source", "Salary") || "Income";
+    const { error } = await supabase.from("incomes").insert({ user_id: session.user.id, source, amount, received_at: today() });
+    if (error) return notify(error.message);
+    setIncome(x => x + amount);
+    notify("Income saved securely.");
+  };
+
   const addExpense = async (prefill = {}) => {
     if (!session || !supabase) return notify("Please sign in first.");
     const amount = Number(prefill.amount ?? (window.prompt("Expense amount (₹)") || 0));
@@ -270,10 +281,10 @@ function App() {
     </header>
 
     <main>
-      {supabaseConfigured && !session && <section className="authGate"><div className="panel authCard"><label>SECURE ACCOUNT</label><h1>Sign in to Money Save</h1><p>Use email OTP to protect your finance data.</p><button onClick={async () => { const email = window.prompt("Enter your email"); if (!email) return; const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.origin } }); notify(error ? error.message : "Check your email for the secure sign-in link."); }}>Send secure login link</button><small>Google sign-in can be enabled in your Supabase authentication providers.</small></div></section>}
+      {supabaseConfigured && !session && <section className="authGate"><div className="panel authCard"><label>SECURE ACCOUNT</label><h1>Sign in to Money Save</h1><p>Sign in securely to keep your expenses, income, coins and rewards tied to your account.</p><button onClick={async () => { const email = window.prompt("Enter your email"); if (!email) return; const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.href } }); notify(error ? error.message : "Check your email for the secure sign-in link."); }}>Email sign-in link</button><button className="secondary" onClick={async () => { const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.href } }); if (error) notify(error.message); }}>Continue with Google</button></div></section>}
 
       {tab === "home" && <section className="page">
-        <div className="hero"><div><label>GOOD MONEY HABITS</label><h1>Make every rupee count.</h1><p>Save your money, secure it, and watch your future savings grow.</p></div><button onClick={() => addExpense()}>+ Add Expense</button></div>
+        <div className="hero"><div><label>GOOD MONEY HABITS</label><h1>Make every rupee count.</h1><p>Save your money, secure it, and watch your future savings grow.</p></div><div className="heroActions"><button onClick={() => addExpense()}>+ Add Expense</button><button className="secondary" onClick={addIncome}>+ Add Income</button></div></div>
         <div className="cards">{[["Total income",money(income),"This month"],["Total expenses",money(total),expenses.length+" recorded"],["Estimated savings",money(savings),Math.round(savings / Math.max(income,1) * 100)+"% savings rate"],["Goal progress",Math.min(100,Math.round(savings/30000*100))+"%","Goal ₹30,000"]].map(x=><div className="card" key={x[0]}><span>{x[0]}</span><strong>{x[1]}</strong><small>{x[2]}</small></div>)}</div>
         <div className="cols">
           <div className="panel"><div className="panelTitle"><h2>AI Financial Friend</h2><em>● Online</em></div><div className="chat">{chat.slice(-6).map((m,i)=><div className={"msg "+m.role} key={i}>{m.text}</div>)}</div><div className="ask"><input value={question} onChange={e=>setQuestion(e.target.value)} onKeyDown={e=>e.key==="Enter"&&askAI()} placeholder="Ask about your money…"/><button onClick={askAI}>Ask</button></div><small className="hint">{questionsUsed}/{aiLimit} questions today</small></div>
