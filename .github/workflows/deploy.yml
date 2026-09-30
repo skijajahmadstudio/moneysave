@@ -42,6 +42,8 @@ jobs:
         run: |
           if [ -n "$SUPABASE_ACCESS_TOKEN" ] && [ -n "$SUPABASE_PROJECT_REF" ]; then
             npx supabase functions deploy ai-assistant --project-ref "$SUPABASE_PROJECT_REF" --no-verify-jwt
+            npx supabase functions deploy submit-payment --project-ref "$SUPABASE_PROJECT_REF" --no-verify-jwt
+            npx supabase functions deploy review-payment --project-ref "$SUPABASE_PROJECT_REF" --no-verify-jwt
           else
             echo "Supabase deploy secrets are not configured; skipping Edge Function deploy."
           fi
