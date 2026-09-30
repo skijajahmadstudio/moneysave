@@ -24,7 +24,7 @@ function App() {
   const [premium, setPremium] = useState(() => localStorage.getItem("ms_premium") === "true");
   const [userId] = useState(() => localStorage.getItem("ms_uid") || uid());
   const [question, setQuestion] = useState("");
-  const [chat, setChat] = useState([{ role: "ai", text: "Hello! I’m your AI Financial Friend. Ask me about spending, saving, goals, or a purchase." }]);
+  const [chat, setChat] = useState(() => JSON.parse(localStorage.getItem("ms_chat") || "null") || [{ role: "ai", text: "Hello! I’m your AI Financial Friend. Ask me about spending, saving, goals, or a purchase." }]);
   const [toast, setToast] = useState("");
   const [modal, setModal] = useState(null);
   const [receipt, setReceipt] = useState(null);
@@ -41,7 +41,7 @@ function App() {
     localStorage.setItem("ms_expenses", JSON.stringify(expenses));
     localStorage.setItem("ms_coins", coins);
     localStorage.setItem("ms_premium", premium);
-    localStorage.setItem("ms_challenge", challengeDays);
+    localStorage.setItem("ms_challenge", challengeDays);\n    localStorage.setItem("ms_chat", JSON.stringify(chat.slice(-20)));
   }, [userId, income, expenses, coins, premium, challengeDays]);
 
   useEffect(() => {
@@ -57,6 +57,20 @@ function App() {
   const cats = useMemo(() => expenses.reduce((a, e) => { a[e.category] = (a[e.category] || 0) + Number(e.amount); return a; }, {}), [expenses]);
   const top = Object.entries(cats).sort((a, b) => b[1] - a[1])[0];
   const isOwner = session?.user?.email?.toLowerCase() === OWNER_EMAIL;
+  const aiLimit = premium ? 100 : 30;
+  const monthKey = today().slice(0, 7);
+  const monthExpenses = expenses.filter(e => String(e.date || "").slice(0, 7) === monthKey);
+  const monthTotal = monthExpenses.reduce((s, e) => s + Number(e.amount || 0), 0);
+  const monthCats = monthExpenses.reduce((a, e) => { a[e.category] = (a[e.category] || 0) + Number(e.amount || 0); return a; }, {});
+  const monthTop = Object.entries(monthCats).sort((a, b) => b[1] - a[1])[0];
+  const monthSavingsRate = income > 0 ? Math.round(Math.max(income - monthTotal, 0) / income * 100) : 0;
+  const monthTopShare = monthTotal > 0 && monthTop ? Math.round(Number(monthTop[1]) / monthTotal * 100) : 0;
+  const proactiveAlerts = [];
+  if (income > 0 && monthTotal >= income * 0.8) proactiveAlerts.push(`Spending has reached ${Math.round(monthTotal / income * 100)}% of income.`);
+  if (income > 0 && monthSavingsRate < 20) proactiveAlerts.push(`Your current savings rate is ${monthSavingsRate}%; review discretionary spending.`);
+  if (monthTop && monthTopShare >= 35) proactiveAlerts.push(`${monthTop[0]} is ${monthTopShare}% of this month’s recorded spending.`);
+  const largestRecent = [...monthExpenses].sort((a, b) => Number(b.amount) - Number(a.amount))[0];
+  if (largestRecent && income > 0 && Number(largestRecent.amount) >= income * 0.1) proactiveAlerts.push(`${largestRecent.merchant} is a large single expense at ${money(largestRecent.amount)}.`);
   const aiLimit = premium ? 100 : 30;
   const questionsUsed = chat.filter(x => x.role === "user").length;
 
@@ -125,7 +139,7 @@ function App() {
               coins,
               premium,
               challengeDays,
-              dailyCheckin: checkin,
+              dailyCheckin: checkin,\n              conversationMemory: chat.slice(-8),\n              monthlyPattern: { month: monthKey, total: monthTotal, savingsRate: monthSavingsRate, topCategory: monthTop ? monthTop[0] : "Other", topCategoryShare: monthTopShare, alerts: proactiveAlerts },
             },
           },
         });
@@ -224,7 +238,7 @@ function App() {
         <div className="cards">{[["Total income",money(income),"This month"],["Total expenses",money(total),expenses.length+" recorded"],["Estimated savings",money(savings),Math.round(savings / Math.max(income,1) * 100)+"% savings rate"],["Goal progress",Math.min(100,Math.round(savings/30000*100))+"%","Goal ₹30,000"]].map(x=><div className="card" key={x[0]}><span>{x[0]}</span><strong>{x[1]}</strong><small>{x[2]}</small></div>)}</div>
         <div className="cols">
           <div className="panel"><div className="panelTitle"><h2>AI Financial Friend</h2><em>● Online</em></div><div className="chat">{chat.slice(-6).map((m,i)=><div className={"msg "+m.role} key={i}>{m.text}</div>)}</div><div className="ask"><input value={question} onChange={e=>setQuestion(e.target.value)} onKeyDown={e=>e.key==="Enter"&&askAI()} placeholder="Ask about your money…"/><button onClick={askAI}>Ask</button></div><small className="hint">{questionsUsed}/{aiLimit} questions today</small></div>
-          <div className="panel"><div className="panelTitle"><h2>Spending insight</h2><span className="pill">AI</span></div><div className="insight"><div className="ring">{top ? Math.round(top[1]/Math.max(total,1)*100) : 0}%</div><div><b>{top ? top[0] : "No data yet"}</b><p>Your highest recorded spending category. Review non-essential purchases here first.</p></div></div><hr/><h3>Daily check-in</h3><div className="formGrid"><input value={checkin.amount} onChange={e=>setCheckin({...checkin,amount:e.target.value})} placeholder="Spent today ₹"/><input value={checkin.purpose} onChange={e=>setCheckin({...checkin,purpose:e.target.value})} placeholder="What was it for?"/></div><button className="secondary" onClick={logCheckin}>Save check-in</button></div>
+          <div className="panel"><div className="panelTitle"><h2>AI proactive alerts</h2><span className="pill">LIVE</span></div>{proactiveAlerts.length ? <ul className="alerts">{proactiveAlerts.map((x,i)=><li key={i}>{x}</li>)}</ul> : <p>No strong warning right now. Keep logging expenses so the AI can detect patterns earlier.</p>}<hr/><div className="panelTitle"><h2>Spending insight</h2><span className="pill">AI</span></div><div className="insight"><div className="ring">{top ? Math.round(top[1]/Math.max(total,1)*100) : 0}%</div><div><b>{top ? top[0] : "No data yet"}</b><p>Your highest recorded spending category. Review non-essential purchases here first.</p></div></div><hr/><h3>Daily check-in</h3><div className="formGrid"><input value={checkin.amount} onChange={e=>setCheckin({...checkin,amount:e.target.value})} placeholder="Spent today ₹"/><input value={checkin.purpose} onChange={e=>setCheckin({...checkin,purpose:e.target.value})} placeholder="What was it for?"/></div><button className="secondary" onClick={logCheckin}>Save check-in</button></div>
         </div>
       </section>}
 
