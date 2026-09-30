@@ -122,115 +122,55 @@ function App() {
   };
 
   const askAI = async () => {
-    if (!question.trim()) return;
+    const asked = question.trim();
+    if (!asked) return;
     if (questionsUsed >= aiLimit) return notify("Daily AI question limit reached.");
+    setChat(x => [...x, { role: "user", text: asked }]);
+    setQuestion("");
 
-    const asked = question;
-    const q = asked.toLowerCase();
     const isBengali = /[\u0980-\u09FF]/.test(asked);
     const savingsRate = income > 0 ? Math.round((savings / income) * 100) : 0;
-    const topAmount = top ? Number(top[1]) : 0;
-    const topShare = total > 0 ? Math.round((topAmount / total) * 100) : 0;
-    const recentTotal = expenses.slice(0, 5).reduce((sum, e) => sum + Number(e.amount || 0), 0);
-    const avgRecent = expenses.length ? Math.round(total / expenses.length) : 0;
-
-    let answer = isBengali
-      ? `আমি আগে আপনার বর্তমান হিসাব মিলিয়ে দেখছি: আয় ${money(income)}, রেকর্ড করা খরচ ${money(total)}, আনুমানিক সঞ্চয় ${money(savings)}, এবং সঞ্চয়ের হার ${savingsRate}%।`
-      : `I checked your current numbers: income ${money(income)}, recorded spending ${money(total)}, estimated savings ${money(savings)}, and a ${savingsRate}% savings rate.`;
-    if (!expenses.length) {
-      answer += isBengali
-        ? " নির্ভরযোগ্য খরচের ধরণ ধরতে আরও কিছু spending history দরকার।"
-        : " I need a little more spending history before I can identify a reliable pattern.";
-    } else if (/why|ran out|শেষ|কোথায়|কেন/.test(q)) {
-      answer += top
-        ? (isBengali
-          ? ` এখন আপনার সবচেয়ে বড় খরচের বিভাগ ${top[0]} — ${money(topAmount)}, অর্থাৎ মোট রেকর্ড করা খরচের ${topShare}%। সাম্প্রতিক ৫টি খরচ মিলিয়ে ${money(recentTotal)}। তাই একটি মাত্র কেনাকাটাকে দোষ না দিয়ে পুনরাবৃত্ত খরচের ধরণ দেখা বেশি যুক্তিযুক্ত।`
-          : ` ${top[0]} is currently your largest category at ${money(topAmount)} (${topShare}% of recorded spending). The recent 5 expenses total ${money(recentTotal)}. That suggests we should inspect repeated spending rather than blame one purchase.`)
-        : (isBengali ? " আপনার খরচের ইতিহাস এখনও খুব ছোট, তাই শক্তিশালী pattern বলা যাচ্ছে না।" : " Your spending history is still too small to identify a strong pattern.");
-    } else if (/save|saving|reduce|কম|বাঁচ|সঞ্চয়/.test(q)) {
-      const target = Math.max(0, Math.round(income * 0.1));
-      answer += isBengali
-        ? ` একটি বাস্তবসম্মত পরবর্তী লক্ষ্য হলো এই মাসে discretionary খরচের আগে অন্তত ${money(target)} আলাদা করে রাখা। আগে ${top ? top[0] : "সবচেয়ে বড় খরচের বিভাগ"} দেখুন এবং সাপ্তাহিক সীমা ঠিক করুন। বর্তমানে আনুমানিক সঞ্চয় ${money(savings)}।`
-        : `A practical next target is to protect at least ${money(target)} this month before discretionary spending. Start by reviewing ${top ? top[0] : "your largest category"} and setting a weekly limit. Your current savings are ${money(savings)}.`;
-    } else if (/purchase|buy|কিনব|কেনা|কেনবো/.test(q)) {
-      answer += isBengali
-        ? " কেনাকাটার সিদ্ধান্তে দাম ও উদ্দেশ্য জানালে আমি আপনার বর্তমান cash position, সঞ্চয়ের লক্ষ্য এবং সাম্প্রতিক খরচের ধরণ মিলিয়ে দেখব—শুধু দামের ভিত্তিতে বিচার করব না।"
-        : " For a purchase decision, I need the price and purpose. I will compare it with your current cash position, savings target and recent spending pattern instead of judging the purchase from price alone.";
-    } else if (/budget|plan|বাজেট|পরিকল্পনা/.test(q)) {
-      answer += isBengali
-        ? ` প্রতি expense entry-তে গড় খরচ প্রায় ${money(avgRecent)}। essentials ও discretionary খরচ আলাদা করে সবচেয়ে বড় category-র জন্য weekly cap সেট করা ভালো পরবর্তী ধাপ।`
-        : `Your recorded average expense is about ${money(avgRecent)} per entry. A useful next step is to separate essentials from discretionary spending and set a weekly cap for the largest category.`;
-    } else if (/salary|income|আয়|ইনকাম|বেতন/.test(q)) {
-      const suggested = Math.max(0, income - total);
-      answer += isBengali
-        ? `আপনার রেকর্ড অনুযায়ী আয় ${money(income)} এবং খরচ ${money(total)}; পার্থক্য ${money(suggested)}। আপনি চাইলে আমি এই টাকাটা emergency fund, goal এবং discretionary budget-এ ভাগ করে একটি মাসিক plan বানাতে পারি।`
-        : `Your recorded income is ${money(income)} and spending is ${money(total)}, leaving about ${money(suggested)} before other unrecorded costs. I can turn that into a monthly emergency-fund, goal and discretionary budget plan.`;
-    } else if (/emergency|জরুরি|ফান্ড/.test(q)) {
-      const monthlyNeed = Math.max(monthTotal, total, 0);
-      const target = Math.round(monthlyNeed * 3);
-      answer += isBengali
-        ? `আপনার বর্তমান recorded spending ${money(monthlyNeed)} ধরে ৩ মাসের একটি illustrative emergency-fund target প্রায় ${money(target)}। আপনার বাস্তব essential monthly cost জানলে target আরও নির্ভুল হবে।`
-        : `Using your recorded spending of ${money(monthlyNeed)} as a rough baseline, a 3-month illustrative emergency-fund target is about ${money(target)}. It becomes more accurate if we separate essential monthly costs from discretionary spending.`;
-    } else if (/invest|stock|mutual|fd|gold|শেয়ার|মিউচুয়াল|বিনিয়োগ/.test(q)) {
-      answer += isBengali
-        ? " বিনিয়োগের ক্ষেত্রে আমি return-এর পাশাপাশি downside, fees, tax, liquidity এবং আপনার সময়সীমা দেখব। শুধু একটি সম্ভাব্য return দেখে সিদ্ধান্ত নেওয়া উচিত নয়।"
-        : "For investing, I would compare potential return with downside risk, fees, taxes, liquidity and your time horizon. A possible return alone is not enough to evaluate an investment.";
-    } else if (/debt|loan|ঋণ|লোন|কিস্তি/.test(q)) {
-      answer += isBengali
-        ? " ঋণ নিয়ে বললে বাকি principal, interest rate, EMI এবং due date দরকার। এগুলো দিলে আমি interest cost, cash-flow pressure এবং repayment options তুলনা করে দেখাতে পারি।"
-        : "For debt, the key inputs are outstanding principal, interest rate, EMI and due date. With those, I can compare interest cost, cash-flow pressure and repayment options.";
-    } else {
-      answer += top
-        ? (isBengali
-          ? `আপনার বর্তমান ডেটায় ${top[0]} সবচেয়ে বড় category: ${money(topAmount)} (${topShare}%)। মোট সঞ্চয় ${money(savings)}। এই তথ্য থেকে সবচেয়ে ব্যবহারযোগ্য পরবর্তী পদক্ষেপ হলো ${top[0]}-এর recurring খরচ আলাদা করে দেখা এবং একটি সীমা সেট করা।`
-          : `Your largest recorded category is ${top[0]} at ${money(topAmount)} (${topShare}%), with about ${money(savings)} remaining from the recorded income. A useful next step is to identify recurring ${top[0]} spending and set a clear limit.`)
-        : (isBengali ? "আপনার প্রশ্নটি বুঝেছি। নির্দিষ্ট amount, goal বা expense-এর নাম দিলে আমি সরাসরি হিসাব করে বলব।" : "I understand the question. Give me the amount, goal or expense involved and I’ll calculate the relevant trade-offs directly.");
-    }
+    const context = {
+      income,
+      totalExpenses: total,
+      savings,
+      savingsRate,
+      topCategory: top ? top[0] : "Other",
+      categoryBreakdown: Object.fromEntries(Object.entries(cats).map(([name, amount]) => [name, Math.round(amount)])),
+      recentExpenses: expenses.slice(0, 10).map(e => ({ merchant: e.merchant, category: e.category, amount: Number(e.amount), date: e.date })),
+      coins,
+      premium,
+      challengeDays,
+      dailyCheckin: checkin,
+      conversationMemory: chat.slice(-10),
+      monthlyPattern: { month: monthKey, total: monthTotal, savingsRate: monthSavingsRate, topCategory: monthTop ? monthTop[0] : "Other", topCategoryShare: monthTopShare, alerts: proactiveAlerts },
+    };
 
     if (supabaseConfigured && session) {
       try {
-        const { data, error } = await supabase.functions.invoke("ai-assistant", {
-          body: {
-            question: asked,
-            context: {
-              income,
-              totalExpenses: total,
-              savings,
-              savingsRate: income > 0 ? Math.round((savings / income) * 100) : 0,
-              topCategory: top ? top[0] : "Other",
-              categoryBreakdown: Object.fromEntries(
-                Object.entries(cats).map(([name, amount]) => [name, Math.round(amount)])
-              ),
-              recentExpenses: expenses.slice(0, 10).map(e => ({
-                merchant: e.merchant,
-                category: e.category,
-                amount: Number(e.amount),
-                date: e.date,
-              })),
-              coins,
-              premium,
-              challengeDays,
-              dailyCheckin: checkin,
-              conversationMemory: chat.slice(-8),
-              monthlyPattern: { month: monthKey, total: monthTotal, savingsRate: monthSavingsRate, topCategory: monthTop ? monthTop[0] : "Other", topCategoryShare: monthTopShare, alerts: proactiveAlerts },
-            },
-          },
-        });
+        const { data, error } = await supabase.functions.invoke("ai-assistant", { body: { question: asked, context } });
         if (!error && data?.answer) {
-          answer = data.answer;
-          setChat(x => [...x, { role: "user", text: asked }, { role: "ai", text: answer }]);
-          setQuestion("");
+          setChat(x => [...x, { role: "ai", text: data.answer }]);
           return;
         }
-      } catch {
-        // Keep the local fallback available if the Edge Function is not deployed yet.
-      }
+      } catch {}
     }
 
-    setChat(x => [...x, { role: "user", text: asked }, { role: "ai", text: answer }]);
-    setQuestion("");
+    const q = asked.toLowerCase();
+    const topAmount = top ? Number(top[1]) : 0;
+    const topShare = total > 0 ? Math.round(topAmount / total * 100) : 0;
+    let fallback;
+    if (/hello|hi|হাই|হ্যালো|নমস্কার/.test(q)) {
+      fallback = isBengali ? "হ্যালো! আপনার আয়, খরচ, সঞ্চয় বা কোনো নির্দিষ্ট কেনাকাটা নিয়ে প্রশ্ন করুন।" : "Hi! Ask me about your income, spending, savings, budget, or a specific purchase.";
+    } else if (/how much.*save|save.*month|সঞ্চয়.*কত|কত.*সঞ্চয়/.test(q)) {
+      fallback = isBengali ? `আপনার রেকর্ড অনুযায়ী এখন প্রায় ${money(savings)} অবশিষ্ট আছে।` : `Based on your recorded numbers, about ${money(savings)} remains.`;
+    } else if (/why|ran out|কেন|কোথায়|কোথায়/.test(q) && top) {
+      fallback = isBengali ? `${top[0]} সবচেয়ে বড় খরচের category: ${money(topAmount)} (${topShare}%)। তাই আগে এই category-র recurring খরচগুলো দেখুন।` : `${top[0]} is your largest recorded category at ${money(topAmount)} (${topShare}%). Review recurring spending there first.`;
+    } else {
+      fallback = isBengali ? "এই প্রশ্নের নির্ভুল উত্তর দিতে আরও নির্দিষ্ট তথ্য দরকার—যেমন amount, goal, income বা expense-এর নাম।" : "I need one specific detail—such as the amount, goal, income, or expense involved—to answer this accurately.";
+    }
+    setChat(x => [...x, { role: "ai", text: fallback }]);
   };
-
   const logCheckin = () => {
     const amount = Number(checkin.amount);
     if (!amount || !checkin.purpose) return notify("Enter amount and purpose first.");
