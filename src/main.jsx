@@ -30,7 +30,7 @@ function App() {
   const [receipt, setReceipt] = useState(null);
   const [research, setResearch] = useState({ type: "stock", name: "", amount: 10000, years: 5, rate: 10, risk: "medium" });
   const [business, setBusiness] = useState({ capital: 10000, skill: "online sales" });
-  const [payment, setPayment] = useState({ reference: "", file: null, status: "Not submitted" });
+  const [payment, setPayment] = useState({ reference: "", file: null, status: "Not submitted" });\n  const [paymentQueue, setPaymentQueue] = useState([]);
   const [challengeDays, setChallengeDays] = useState(0);
   const [checkin, setCheckin] = useState({ amount: "", purpose: "", need: "yes" });
   const [liveOpen, setLiveOpen] = useState(false);\n  const [goal, setGoal] = useState(null);
@@ -238,11 +238,33 @@ function App() {
     ]});
   };
 
-  const submitPayment = () => {
+  const submitPayment = async () => {
+    if (!session || !supabase) return notify("Please sign in first.");
     if (!payment.reference && !payment.file) return notify("Add a transaction reference or payment screenshot.");
-    setPayment(p => ({ ...p, status: "Automated Review" }));
-    notify("Payment submitted • Automated Review → Human Review");
-    setTimeout(() => setPayment(p => ({ ...p, status: "Human Review" })), 1200);
+    let screenshotBase64 = "";
+    if (payment.file) {
+      if (!payment.file.type.startsWith("image/")) return notify("Please upload an image.");
+      if (payment.file.size > 5 * 1024 * 1024) return notify("Screenshot must be under 5 MB.");
+      screenshotBase64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = reject;
+        reader.readAsDataURL(payment.file);
+      });
+    }
+    setPayment(p => ({ ...p, status: "Submitting…" }));
+    const { data, error } = await supabase.functions.invoke("submit-payment", {
+      body: {
+        plan: "premium",
+        amount: 0,
+        transactionReference: payment.reference,
+        screenshotBase64,
+        fileName: payment.file?.name || "payment.jpg",
+      },
+    });
+    if (error) return setPayment(p => ({ ...p, status: "Submission failed" }));
+    setPayment(p => ({ ...p, status: data?.submission?.status === "automated_review" ? "Automated Review → Human Review" : "Restricted" }));
+    notify("Payment proof submitted securely. Approval happens only after verification.");
   };
 
   const claimReward = threshold => {
@@ -304,7 +326,7 @@ function App() {
 
       {tab === "profile" && <section className="page"><label>ACCOUNT</label><h1>Your profile</h1><div className="panel profile"><div className="avatar">MS</div><div><h2>Money Save User</h2><p>User ID: <b>{userId}</b></p><span className="badge">{premium ? "PREMIUM USER" : "FREE USER"}</span></div></div><div className="panel"><h2>Upgrade to Premium</h2><p>Premium raises AI questions from 30/day to 100/day and live access from 10 to 30 minutes/day.</p><button onClick={()=>setTab("rewards")}>Open payment verification</button></div><div className="panel"><h2>Support</h2><p>{SUPPORT_EMAIL}</p></div></section>}
 
-      {tab === "admin" && <section className="page"><label>OWNER CONTROL</label><h1>Admin Command Center</h1><div className="notice">Owner: <b>{OWNER_EMAIL}</b> • Server-side authorization should be enforced when Supabase is connected.</div><div className="cards">{[["Users",userId],["Coins",coins.toLocaleString()],["Expenses",expenses.length],["Premium",premium?"Active":"Free"]].map(x=><div className="card" key={x[0]}><span>{x[0]}</span><strong>{x[1]}</strong><small>Live local view</small></div>)}</div><div className="panel"><h2>Verification queue</h2><p>Payment status: <b>{payment.status}</b></p><p>Reward policy: 30k → ₹10; 50k → ₹30; above 50k no extra cash tier. Claims remain subject to verification, anti-fraud checks and company policy.</p><p>Audit: every future manual adjustment should record actor, reason, timestamp and target user.</p></div></section>}
+      {tab === "admin" && <section className="page"><label>OWNER CONTROL</label><h1>Admin Command Center</h1><div className="notice">Owner: <b>{OWNER_EMAIL}</b> • Server-side authorization should be enforced when Supabase is connected.</div><div className="cards">{[["Users",userId],["Coins",coins.toLocaleString()],["Expenses",expenses.length],["Premium",premium?"Active":"Free"]].map(x=><div className="card" key={x[0]}><span>{x[0]}</span><strong>{x[1]}</strong><small>Live local view</small></div>)}</div><div className="panel"><h2>Verification queue</h2><p>Payment status: <b>{payment.status}</b></p><p>Payment approval is server-side only. A screenshot/reference is evidence, not proof of payment.</p><button onClick={async()=>{if(!supabase||!session)return;const {data,error}=await supabase.from("payment_submissions").select("id,user_id,plan,amount,transaction_reference,status,review_reason,created_at").order("created_at",{ascending:false}).limit(50);if(error)return notify(error.message);setPaymentQueue(data||[]);}}>Refresh payment queue</button>{paymentQueue?.map(p=><div className="panel" key={p.id}><b>{p.status}</b> • {p.transaction_reference||"No reference"}<small>{new Date(p.created_at).toLocaleString("en-IN")}</small>{["submitted","automated_review","human_review"].includes(p.status)&&<div className="heroActions"><button onClick={async()=>{const reason=window.prompt("Verification note","Payment verified after transaction/reference check.")||"";const {data,error}=await supabase.functions.invoke("review-payment",{body:{submissionId:p.id,decision:"approved",reason}});if(error)return notify(error.message);notify("Premium approved.");setPaymentQueue(q=>q.map(x=>x.id===p.id?{...x,status:data.status,review_reason:reason}:x));}}>Approve Premium</button><button className="secondary" onClick={async()=>{const reason=window.prompt("Rejection reason","Payment could not be verified.")||"Payment could not be verified.";const {error}=await supabase.functions.invoke("review-payment",{body:{submissionId:p.id,decision:"rejected",reason}});if(error)return notify(error.message);notify("Payment rejected.");setPaymentQueue(q=>q.map(x=>x.id===p.id?{...x,status:"rejected",review_reason:reason}:x));}}>Reject</button></div>}<small>{p.review_reason||""}</small></div>)}</div></section>}
     </main>
 
     <nav>{nav.map(([id,name])=><button key={id} className={tab===id?"active":""} onClick={()=>setTab(id)}>{name}</button>)}</nav>
