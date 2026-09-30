@@ -65,12 +65,10 @@ Deno.serve(async (req) => {
     .join(", ");
   const memoryText = conversationMemory
     .map((m: any) => `${m.role === "user" ? "User" : "AI"}: ${String(m.text || "").slice(0, 500)}`)
-    .join("
-");
+    .join("\\n");
   const recentText = recentExpenses
     .map((e: any) => `${e.date || "date"} — ${e.merchant || "expense"} — ${e.category || "Other"} — ₹${Math.round(Number(e.amount) || 0).toLocaleString("en-IN")}`)
-    .join("
-");
+    .join("\\n");
 
   let answer =
     `Based on the information available, you have recorded ₹${Math.round(total).toLocaleString("en-IN")} in expenses and about ₹${Math.round(savings).toLocaleString("en-IN")} remaining from ₹${Math.round(income).toLocaleString("en-IN")} income. Your current savings rate is about ${savingsRate}%, and ${topCategory} is the largest recorded category. I can give a more precise diagnosis as you add more spending history.`;
@@ -107,8 +105,7 @@ ${recentText || "No recent expenses available"}`,
       `Monthly pattern: ${JSON.stringify(monthlyPattern)}`,
       `Recent conversation:
 ${memoryText || "No prior conversation available"}`,
-    ].join("
-");
+    ].join("\\n");
 
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
