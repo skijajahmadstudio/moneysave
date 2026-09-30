@@ -56,12 +56,12 @@ Deno.serve(async (req) => {
   const categoryBreakdown = context.categoryBreakdown || {};
   const recentExpenses = Array.isArray(context.recentExpenses) ? context.recentExpenses.slice(0, 10) : [];
   const coins = Number(context.coins || 0);
-  const challengeDays = Number(context.challengeDays || 0);
+  const challengeDays = Number(context.challengeDays || 0);\n  const conversationMemory = Array.isArray(context.conversationMemory) ? context.conversationMemory.slice(-8) : [];\n  const monthlyPattern = context.monthlyPattern || {};
 
   const categoryText = Object.entries(categoryBreakdown)
     .map(([name, amount]) => `${name}: ₹${Math.round(Number(amount)).toLocaleString("en-IN")}`)
     .join(", ");
-  const recentText = recentExpenses
+  const memoryText = conversationMemory\n    .map((m: any) => `${m.role === "user" ? "User" : "AI"}: ${String(m.text || "").slice(0, 500)}`)\n    .join("\\n");\n  const recentText = recentExpenses
     .map((e: any) => `${e.date || "date"} — ${e.merchant || "expense"} — ${e.category || "Other"} — ₹${Math.round(Number(e.amount) || 0).toLocaleString("en-IN")}`)
     .join("\n");
 
@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
       "Before answering, reason privately through the user's question, income, expenses, category mix, recent transactions, savings rate and stated context. Check arithmetic and distinguish facts from estimates.",
       "Do not reveal private chain-of-thought or hidden reasoning. Give the user the useful conclusion and a brief explanation of the key factors.",
       "Do not jump to conclusions from one transaction. Look for repeated patterns, unusually large expenses, category concentration, cash-flow pressure and goal impact when the data supports it.",
-      "If the data is insufficient, say exactly what is missing and ask at most one focused follow-up question.",
+      "Use the recent conversation memory to keep continuity, but treat current financial numbers as the source of truth. Do not invent facts that are not in the current context.",\n      "If the data is insufficient, say exactly what is missing and ask at most one focused follow-up question.",
       "Prefer concrete numbers, comparisons and small actionable next steps. For spending questions, explain WHY the pattern matters and what could change it.",
       "For purchase decisions, assess affordability, necessity, opportunity cost and effect on the user's stated savings position; do not make the final decision for them.",
       "For investing, explain risk, fees, downside and uncertainty; never guarantee returns or present an estimate as a promise.",
@@ -89,7 +89,7 @@ Deno.serve(async (req) => {
       `Largest category: ${topCategory}`,
       `Category breakdown: ${categoryText || "No category breakdown available"}`,
       `Recent expenses:\n${recentText || "No recent expenses available"}`,
-      `Coins: ${coins}; savings challenge days completed: ${challengeDays}`,
+      `Coins: ${coins}; savings challenge days completed: ${challengeDays}`,\n      `Monthly pattern: ${JSON.stringify(monthlyPattern)}`,\n      `Recent conversation:\\n${memoryText || "No prior conversation available"}`,
     ].join("\n");
 
     const response = await fetch("https://api.openai.com/v1/responses", {
