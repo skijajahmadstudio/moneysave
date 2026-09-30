@@ -30,10 +30,12 @@ function App() {
   const [receipt, setReceipt] = useState(null);
   const [research, setResearch] = useState({ type: "stock", name: "", amount: 10000, years: 5, rate: 10, risk: "medium" });
   const [business, setBusiness] = useState({ capital: 10000, skill: "online sales" });
-  const [payment, setPayment] = useState({ reference: "", amount: "", file: null, status: "Not submitted" });\n  const [paymentQueue, setPaymentQueue] = useState([]);
+  const [payment, setPayment] = useState({ reference: "", amount: "", file: null, status: "Not submitted" });
+  const [paymentQueue, setPaymentQueue] = useState([]);
   const [challengeDays, setChallengeDays] = useState(0);
   const [checkin, setCheckin] = useState({ amount: "", purpose: "", need: "yes" });
-  const [liveOpen, setLiveOpen] = useState(false);\n  const [goal, setGoal] = useState(null);
+  const [liveOpen, setLiveOpen] = useState(false);
+  const [goal, setGoal] = useState(null);
 
   useEffect(() => {
     if (!supabaseConfigured) return;
@@ -240,7 +242,9 @@ function App() {
 
   const submitPayment = async () => {
     if (!session || !supabase) return notify("Please sign in first.");
-    if (!payment.reference && !payment.file) return notify("Add a transaction reference or payment screenshot.");\n    const paymentAmount = Number(payment.amount || 0);\n    if (!paymentAmount || paymentAmount <= 0) return notify("Enter the amount you paid.");
+    if (!payment.reference && !payment.file) return notify("Add a transaction reference or payment screenshot.");
+    const paymentAmount = Number(payment.amount || 0);
+    if (!paymentAmount || paymentAmount <= 0) return notify("Enter the amount you paid.");
     let screenshotBase64 = "";
     if (payment.file) {
       if (!payment.file.type.startsWith("image/")) return notify("Please upload an image.");
