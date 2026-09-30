@@ -48,23 +48,48 @@ Deno.serve(async (req) => {
   if (used >= limit) return reply({ error: "Daily AI question limit reached", limit }, 429);
 
   const context = body.context || {};
+  const income = Number(context.income || 0);
   const total = Number(context.totalExpenses || 0);
   const savings = Number(context.savings || 0);
+  const savingsRate = Number(context.savingsRate || 0);
   const topCategory = String(context.topCategory || "Other");
+  const categoryBreakdown = context.categoryBreakdown || {};
+  const recentExpenses = Array.isArray(context.recentExpenses) ? context.recentExpenses.slice(0, 10) : [];
+  const coins = Number(context.coins || 0);
+  const challengeDays = Number(context.challengeDays || 0);
+
+  const categoryText = Object.entries(categoryBreakdown)
+    .map(([name, amount]) => `${name}: ₹${Math.round(Number(amount)).toLocaleString("en-IN")}`)
+    .join(", ");
+  const recentText = recentExpenses
+    .map((e: any) => `${e.date || "date"} — ${e.merchant || "expense"} — ${e.category || "Other"} — ₹${Math.round(Number(e.amount) || 0).toLocaleString("en-IN")}`)
+    .join("\n");
 
   let answer =
-    `You have recorded ₹${Math.round(total).toLocaleString("en-IN")} in expenses and about ₹${Math.round(savings).toLocaleString("en-IN")} remains. Your largest recorded category is ${topCategory}. Add complete daily spending so I can spot patterns.`;
+    `Based on the information available, you have recorded ₹${Math.round(total).toLocaleString("en-IN")} in expenses and about ₹${Math.round(savings).toLocaleString("en-IN")} remaining from ₹${Math.round(income).toLocaleString("en-IN")} income. Your current savings rate is about ${savingsRate}%, and ${topCategory} is the largest recorded category. I can give a more precise diagnosis as you add more spending history.`;
 
   const apiKey = Deno.env.get("OPENAI_API_KEY");
   if (apiKey) {
     const prompt = [
-      "You are Money Save's friendly financial education assistant.",
-      "Be concise, non-judgmental and practical.",
-      "Do not promise returns or make final financial decisions for the user.",
+      "You are Money Save's Financial Friend: a careful, context-aware personal finance education assistant.",
+      "Before answering, reason privately through the user's question, income, expenses, category mix, recent transactions, savings rate and stated context. Check arithmetic and distinguish facts from estimates.",
+      "Do not reveal private chain-of-thought or hidden reasoning. Give the user the useful conclusion and a brief explanation of the key factors.",
+      "Do not jump to conclusions from one transaction. Look for repeated patterns, unusually large expenses, category concentration, cash-flow pressure and goal impact when the data supports it.",
+      "If the data is insufficient, say exactly what is missing and ask at most one focused follow-up question.",
+      "Prefer concrete numbers, comparisons and small actionable next steps. For spending questions, explain WHY the pattern matters and what could change it.",
+      "For purchase decisions, assess affordability, necessity, opportunity cost and effect on the user's stated savings position; do not make the final decision for them.",
+      "For investing, explain risk, fees, downside and uncertainty; never guarantee returns or present an estimate as a promise.",
+      "For business/income ideas, separate startup cost, potential range, assumptions and risks; never guarantee income.",
+      "Be warm, non-judgmental, clear and concise. Use INR and Indian numbering.",
       `User question: ${question}`,
-      `Expense total: ₹${total}`,
-      `Estimated savings: ₹${savings}`,
+      `Monthly/current income: ₹${income}`,
+      `Recorded expenses: ₹${total}`,
+      `Estimated remaining savings: ₹${savings}`,
+      `Current savings rate: ${savingsRate}%`,
       `Largest category: ${topCategory}`,
+      `Category breakdown: ${categoryText || "No category breakdown available"}`,
+      `Recent expenses:\n${recentText || "No recent expenses available"}`,
+      `Coins: ${coins}; savings challenge days completed: ${challengeDays}`,
     ].join("\n");
 
     const response = await fetch("https://api.openai.com/v1/responses", {
@@ -76,7 +101,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model: Deno.env.get("OPENAI_MODEL") || "gpt-5-mini",
         input: prompt,
-        max_output_tokens: 350,
+        max_output_tokens: 500,
       }),
     });
 
