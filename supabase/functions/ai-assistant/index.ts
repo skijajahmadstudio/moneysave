@@ -56,12 +56,17 @@ Deno.serve(async (req) => {
   const categoryBreakdown = context.categoryBreakdown || {};
   const recentExpenses = Array.isArray(context.recentExpenses) ? context.recentExpenses.slice(0, 10) : [];
   const coins = Number(context.coins || 0);
-  const challengeDays = Number(context.challengeDays || 0);\n  const conversationMemory = Array.isArray(context.conversationMemory) ? context.conversationMemory.slice(-8) : [];\n  const monthlyPattern = context.monthlyPattern || {};
+  const challengeDays = Number(context.challengeDays || 0);
+  const conversationMemory = Array.isArray(context.conversationMemory) ? context.conversationMemory.slice(-8) : [];
+  const monthlyPattern = context.monthlyPattern || {};
 
   const categoryText = Object.entries(categoryBreakdown)
     .map(([name, amount]) => `${name}: ₹${Math.round(Number(amount)).toLocaleString("en-IN")}`)
     .join(", ");
-  const memoryText = conversationMemory\n    .map((m: any) => `${m.role === "user" ? "User" : "AI"}: ${String(m.text || "").slice(0, 500)}`)\n    .join("\\n");\n  const recentText = recentExpenses
+  const memoryText = conversationMemory
+    .map((m: any) => `${m.role === "user" ? "User" : "AI"}: ${String(m.text || "").slice(0, 500)}`)
+    .join("\n");
+  const recentText = recentExpenses
     .map((e: any) => `${e.date || "date"} — ${e.merchant || "expense"} — ${e.category || "Other"} — ₹${Math.round(Number(e.amount) || 0).toLocaleString("en-IN")}`)
     .join("\n");
 
@@ -94,7 +99,9 @@ Deno.serve(async (req) => {
       `Largest category: ${topCategory}`,
       `Category breakdown: ${categoryText || "No category breakdown available"}`,
       `Recent expenses:\n${recentText || "No recent expenses available"}`,
-      `Coins: ${coins}; savings challenge days completed: ${challengeDays}`,\n      `Monthly pattern: ${JSON.stringify(monthlyPattern)}`,\n      `Recent conversation:\\n${memoryText || "No prior conversation available"}`,
+      `Coins: ${coins}; savings challenge days completed: ${challengeDays}`,
+      `Monthly pattern: ${JSON.stringify(monthlyPattern)}`,
+      `Recent conversation:\n${memoryText || "No prior conversation available"}`,
     ].join("\n");
 
     const response = await fetch("https://api.openai.com/v1/responses", {
