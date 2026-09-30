@@ -87,9 +87,24 @@ function App() {
           body: {
             question: asked,
             context: {
+              income,
               totalExpenses: total,
               savings,
+              savingsRate: income > 0 ? Math.round((savings / income) * 100) : 0,
               topCategory: top ? top[0] : "Other",
+              categoryBreakdown: Object.fromEntries(
+                Object.entries(cats).map(([name, amount]) => [name, Math.round(amount)])
+              ),
+              recentExpenses: expenses.slice(0, 10).map(e => ({
+                merchant: e.merchant,
+                category: e.category,
+                amount: Number(e.amount),
+                date: e.date,
+              })),
+              coins,
+              premium,
+              challengeDays,
+              dailyCheckin: checkin,
             },
           },
         });
